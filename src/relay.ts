@@ -2,9 +2,10 @@
  * Claude Code Telegram Relay
  *
  * Relay that connects Telegram to Claude Code CLI with:
- * - Supabase persistence (conversations, memory, goals)
+ * - Threaded conversations (DMs + Telegram Topics)
+ * - Three-layer memory (soul, global facts, thread context)
  * - Voice transcription via mlx_whisper
- * - Intent-based memory management (Claude manages memory automatically)
+ * - Intent-based memory management ([LEARN:]/[FORGET:] tags)
  *
  * Run: bun run src/relay.ts
  */
@@ -55,6 +56,10 @@ const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "";
 // Directories
 const TEMP_DIR = join(RELAY_DIR, "temp");
 const UPLOADS_DIR = join(RELAY_DIR, "uploads");
+
+// Claude CLI limits
+const CLAUDE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_OUTPUT_SIZE = 1024 * 1024; // 1MB
 
 // ============================================================
 // SUPABASE
@@ -284,6 +289,20 @@ async function setSoul(content: string): Promise<boolean> {
     return true;
   } catch (e) {
     console.error("setSoul error:", e);
+    return false;
+  }
+}
+
+async function clearThreadSession(threadDbId: string): Promise<boolean> {
+  if (!supabase) return false;
+  try {
+    await supabase
+      .from("threads")
+      .update({ claude_session_id: null, updated_at: new Date().toISOString() })
+      .eq("id", threadDbId);
+    return true;
+  } catch (e) {
+    console.error("clearThreadSession error:", e);
     return false;
   }
 }
@@ -546,15 +565,29 @@ bot.use(async (ctx, next) => {
     return;
   }
 
-  // Extract thread ID: present in forum topic messages, null for DMs
+  const chatType = ctx.chat?.type;
   const telegramThreadId = ctx.message?.message_thread_id ?? null;
 
-  // Determine title: topic name for groups, "DM" for direct messages
-  const title = ctx.message?.is_topic_message
-    ? `Topic ${telegramThreadId}`
-    : "DM";
+  // Determine title and thread ID based on chat context
+  let title: string;
+  let threadId: number | null = telegramThreadId;
 
-  const thread = await getOrCreateThread(chatId, telegramThreadId, title);
+  if (chatType === "private") {
+    // DM: no thread ID, titled "DM"
+    title = "DM";
+  } else if (telegramThreadId != null && ctx.message?.is_topic_message) {
+    // Group with Topics: specific topic
+    title = `Topic ${telegramThreadId}`;
+  } else if ((chatType === "group" || chatType === "supergroup") && telegramThreadId === null) {
+    // Group without Topics, OR the "General" topic in a group with Topics
+    title = "Group Chat";
+    threadId = null;
+  } else {
+    // Fallback
+    title = "DM";
+  }
+
+  const thread = await getOrCreateThread(chatId, threadId, title);
 
   if (thread) {
     ctx.threadInfo = {
@@ -598,9 +631,32 @@ async function callClaude(
       env: { ...process.env },
     });
 
-    const output = await new Response(proc.stdout).text();
-    const stderr = await new Response(proc.stderr).text();
-    const exitCode = await proc.exited;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => {
+        proc.kill();
+        reject(new Error("Claude CLI timed out"));
+      }, CLAUDE_TIMEOUT_MS)
+    );
+
+    let output: string;
+    let stderrText: string;
+    let exitCode: number;
+    try {
+      [output, stderrText, exitCode] = await Promise.race([
+        Promise.all([
+          new Response(proc.stdout).text(),
+          new Response(proc.stderr).text(),
+          proc.exited,
+        ]),
+        timeoutPromise,
+      ]);
+    } catch (error: any) {
+      if (error.message?.includes("timed out")) {
+        console.error("Claude CLI timed out");
+        return { text: "Sorry, that request took too long. Please try a simpler query.", sessionId: null };
+      }
+      throw error;
+    }
 
     if (exitCode !== 0) {
       // If we used --resume and it failed, retry without it (session may be expired/corrupt)
@@ -608,8 +664,14 @@ async function callClaude(
         console.warn(`Session ${threadInfo.sessionId} failed (exit ${exitCode}), starting fresh`);
         return callClaude(prompt, { ...threadInfo, sessionId: null });
       }
-      console.error("Claude error:", stderr);
-      return { text: `Error: ${stderr || "Claude exited with code " + exitCode}`, sessionId: null };
+      console.error("Claude error:", stderrText);
+      return { text: `Error: ${stderrText || "Claude exited with code " + exitCode}`, sessionId: null };
+    }
+
+    // Size guard before JSON parsing
+    if (output.length > MAX_OUTPUT_SIZE) {
+      console.warn(`Claude output very large (${output.length} bytes), truncating`);
+      output = output.substring(0, MAX_OUTPUT_SIZE);
     }
 
     // Parse JSON response
@@ -693,6 +755,39 @@ bot.command("soul", async (ctx) => {
   } else {
     await ctx.reply("Failed to update soul. Check Supabase connection.");
   }
+});
+
+// /new command: reset thread session
+bot.command("new", async (ctx) => {
+  if (!ctx.threadInfo?.dbId) {
+    await ctx.reply("Starting fresh. (No thread context to reset.)");
+    return;
+  }
+
+  const success = await clearThreadSession(ctx.threadInfo.dbId);
+  if (success) {
+    ctx.threadInfo.sessionId = null;
+    await logEventV2("session_reset", "User started new session", {}, ctx.threadInfo.dbId);
+    await ctx.reply("Session reset. Next message starts a fresh conversation.");
+  } else {
+    await ctx.reply("Could not reset session. Check Supabase connection.");
+  }
+});
+
+// /memory command: show global memory
+bot.command("memory", async (ctx) => {
+  const memories = await getGlobalMemory();
+
+  if (memories.length === 0) {
+    await ctx.reply("No memories stored yet. I'll learn facts about you as we chat.");
+    return;
+  }
+
+  let text = `I know ${memories.length} thing${memories.length === 1 ? "" : "s"} about you:\n\n`;
+  text += memories.map((m, i) => `${i + 1}. ${m}`).join("\n");
+  text += "\n\nTo remove a fact, just ask me to forget it.";
+
+  await sendResponse(ctx, text);
 });
 
 // ============================================================

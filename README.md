@@ -145,13 +145,17 @@ nssm start claude-relay
 
 ```
 src/
-  relay.ts          # Core relay (what you customize)
+  relay.ts              # Core relay (what you customize)
 
 examples/
   morning-briefing.ts   # Scheduled daily summary
   smart-checkin.ts      # Proactive check-ins
-  memory.ts             # Persistent memory pattern
-  supabase-schema.sql   # Optional: cloud persistence
+  memory.ts             # Memory patterns (local JSON + intent-based)
+  supabase-schema.sql   # v1 schema (reference)
+  supabase-schema-v2.sql  # v2 schema (threads, memory, soul)
+
+supabase/
+  migrations/           # Applied migration files
 
 daemon/
   launchagent.plist     # macOS daemon config
@@ -194,12 +198,15 @@ if (ctx.from?.id.toString() !== process.env.TELEGRAM_USER_ID) {
 
 ### Session Continuity
 ```typescript
-// Resume conversations with --resume
+// Resume conversations with --resume and JSON output
 const proc = spawn([
   "claude", "-p", prompt,
-  "--resume", sessionId,  // Continue previous conversation
-  "--output-format", "text"
+  "--resume", sessionId,
+  "--output-format", "json"  // Get session_id in response
 ]);
+const json = JSON.parse(await new Response(proc.stdout).text());
+const response = json.result;
+const newSessionId = json.session_id;  // Store for next call
 ```
 
 ### Voice Messages
@@ -217,14 +224,14 @@ const response = await spawnClaude(`Analyze this image: ${imagePath}`);
 
 ### Persistent Memory
 ```typescript
-// Add context to every prompt
-const memory = await loadMemory();
-const fullPrompt = `
-Context: ${memory.facts.join(", ")}
-Goals: ${memory.goals.join(", ")}
-
-User: ${prompt}
-`;
+// Three-layer memory: soul + global facts + thread context
+const soul = await getActiveSoul();        // Personality
+const facts = await getGlobalMemory();     // Cross-thread facts
+const summary = thread.summary;            // Thread summary
+const fullPrompt = `${soul}
+Facts: ${facts.join(", ")}
+Thread context: ${summary}
+User: ${prompt}`;
 ```
 
 ### Scheduled Tasks
@@ -256,10 +263,10 @@ Claude decides IF and WHAT to say.
 
 ### Memory Persistence (`examples/memory.ts`)
 
-Pattern for remembering facts and goals across sessions:
-- Local JSON file (simple)
-- Supabase (cloud, searchable)
-- Any database you prefer
+Patterns for persistent memory:
+- Local JSON file (simplest, good for prototyping)
+- Intent-based auto-learning (Claude decides what to remember via `[LEARN:]` tags)
+- Supabase cloud persistence (production, used by the relay)
 
 ## Environment Variables
 
@@ -275,9 +282,29 @@ RELAY_DIR=~/.claude-relay # Working directory for temp files
 # Optional - Features
 SUPABASE_URL=             # For cloud memory persistence
 SUPABASE_ANON_KEY=        # For cloud memory persistence
-GEMINI_API_KEY=           # For voice transcription
+MLX_WHISPER_PATH=         # For voice transcription (mlx_whisper, macOS only)
 ELEVENLABS_API_KEY=       # For voice responses
 ```
+
+## Bot Commands
+
+| Command | Description |
+|---------|-------------|
+| `/soul <text>` | Set the bot's personality (loaded into every prompt) |
+| `/new` | Reset Claude session for the current thread |
+| `/memory` | Show all learned facts about you |
+
+## Group / Thread Setup
+
+The relay supports Telegram supergroups with Topics for parallel conversations:
+
+1. Create a supergroup in Telegram
+2. Enable Topics in group settings
+3. Add your bot to the group
+4. Disable "Group Privacy" in @BotFather (so the bot reads all messages)
+5. Each forum topic becomes an independent conversation with its own Claude session
+
+DM mode continues to work as before (single conversation).
 
 ## FAQ
 
