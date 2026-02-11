@@ -47,8 +47,8 @@ const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_KEY =
   process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || "";
 
-const MLX_WHISPER_PATH =
-  process.env.MLX_WHISPER_PATH || "/Users/roviana/.local/bin/mlx_whisper";
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const GROQ_WHISPER_MODEL = process.env.GROQ_WHISPER_MODEL || "whisper-large-v3-turbo";
 const FFMPEG_PATH = process.env.FFMPEG_PATH || "/opt/homebrew/bin/ffmpeg";
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || "";
@@ -391,11 +391,15 @@ async function processIntents(response: string, threadDbId?: string): Promise<st
 }
 
 // ============================================================
-// VOICE TRANSCRIPTION (mlx_whisper)
+// VOICE TRANSCRIPTION (Groq Whisper API)
 // ============================================================
 
 async function transcribeAudio(audioPath: string): Promise<string> {
-  // Convert .oga to .wav for whisper
+  if (!GROQ_API_KEY) {
+    throw new Error("GROQ_API_KEY not set — cannot transcribe audio");
+  }
+
+  // Convert .oga to .wav for Whisper API (smaller + more compatible)
   const wavPath = audioPath.replace(/\.[^.]+$/, ".wav");
 
   const ffmpeg = spawn(
@@ -416,47 +420,32 @@ async function transcribeAudio(audioPath: string): Promise<string> {
   );
   await ffmpeg.exited;
 
-  // Run mlx_whisper
-  const whisper = spawn(
-    [
-      MLX_WHISPER_PATH,
-      "--model",
-      "mlx-community/whisper-large-v3-turbo",
-      "--language",
-      "pt",
-      "--output-format",
-      "txt",
-      "--output-dir",
-      TEMP_DIR,
-      wavPath,
-    ],
-    {
-      stdout: "pipe",
-      stderr: "pipe",
-      env: { ...process.env, PATH: `${FFMPEG_PATH.replace(/\/[^/]+$/, "")}:${process.env.PATH || ""}` },
-    }
-  );
+  // Send to Groq Whisper API
+  const audioBuffer = await readFile(wavPath);
+  const formData = new FormData();
+  formData.append("file", new Blob([audioBuffer], { type: "audio/wav" }), "audio.wav");
+  formData.append("model", GROQ_WHISPER_MODEL);
+  // No language param — let Whisper auto-detect for correct multilingual support
 
-  const stderr = await new Response(whisper.stderr).text();
-  const exitCode = await whisper.exited;
+  const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+    },
+    body: formData,
+  });
 
-  if (exitCode !== 0) {
-    console.error("Whisper error:", stderr);
-    throw new Error("Transcription failed");
+  // Cleanup wav immediately
+  await unlink(wavPath).catch(() => {});
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error(`Groq Whisper error ${response.status}: ${errText}`);
+    throw new Error(`Transcription failed: ${response.status}`);
   }
 
-  // Read the output txt file
-  const txtPath = join(
-    TEMP_DIR,
-    wavPath.split("/").pop()!.replace(".wav", ".txt")
-  );
-  const transcription = await readFile(txtPath, "utf-8");
-
-  // Cleanup temp files
-  await unlink(wavPath).catch(() => {});
-  await unlink(txtPath).catch(() => {});
-
-  return transcription.trim();
+  const result = await response.json() as { text: string };
+  return result.text.trim();
 }
 
 // ============================================================
@@ -1124,7 +1113,8 @@ console.log("Starting Claude Telegram Relay...");
 console.log(`Authorized user: ${ALLOWED_USER_ID || "ANY (not recommended)"}`);
 console.log(`Project directory: ${PROJECT_DIR || "(relay working directory)"}`);
 console.log(`Supabase: ${supabase ? "connected" : "disabled"}`);
-console.log(`Voice transcription: mlx_whisper`);
+console.log(`Voice transcription: ${GROQ_API_KEY ? "Groq Whisper API" : "disabled (no GROQ_API_KEY)"}`);
+console.log(`Whisper model: ${GROQ_WHISPER_MODEL}`);
 console.log(`Voice responses (TTS): ${ELEVENLABS_API_KEY ? "ElevenLabs v3" : "disabled"}`);
 console.log("Thread support: enabled (Grammy auto-thread)");
 

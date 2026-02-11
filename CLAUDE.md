@@ -58,7 +58,7 @@ tail -f ~/.claude-relay/relay-error.log
 - **Thread routing middleware** — Extracts `message_thread_id`, creates/finds thread in Supabase, attaches `threadInfo` to context
 - **callClaude()** — Spawns `claude -p "<prompt>" --resume <sessionId> --output-format json --dangerously-skip-permissions`. Parses JSON for response text and session ID. Auto-retries without `--resume` if session is expired/corrupt. 5-minute timeout.
 - **Thread summary generation** — `maybeUpdateThreadSummary()` triggers every 5 exchanges, makes a standalone Claude call to summarize the conversation
-- **Voice transcription** — `transcribeAudio()` converts .oga→.wav via ffmpeg, then runs mlx_whisper (large-v3-turbo, Portuguese default)
+- **Voice transcription** — `transcribeAudio()` converts .oga→.wav via ffmpeg, then sends to Groq Whisper API (auto-detects language)
 - **Text-to-speech** — `textToSpeech()` calls ElevenLabs v3 API, outputs opus format. Max 4500 chars per request.
 - **Voice reply logic**:
   - Voice message in → always reply with voice + text
@@ -96,7 +96,10 @@ Paths:
 - `CLAUDE_PATH` — defaults to `claude` in PATH
 - `PROJECT_DIR` — working directory for Claude CLI spawns
 - `RELAY_DIR` — defaults to `~/.claude-relay`
-- `MLX_WHISPER_PATH` — defaults to `/Users/roviana/.local/bin/mlx_whisper`
+
+Groq (voice transcription):
+- `GROQ_API_KEY` — API key from console.groq.com
+- `GROQ_WHISPER_MODEL` — defaults to `whisper-large-v3-turbo`
 
 Supabase:
 - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (or `SUPABASE_ANON_KEY`)
@@ -119,6 +122,6 @@ Note: Session state is stored per-thread in Supabase (`threads.claude_session_id
 - **grammy** ^1.37+ — Telegram Bot API framework (long-polling, native auto-thread support)
 - **@supabase/supabase-js** ^2.95+ — Cloud persistence for threads, memory, and logs
 - **Bun runtime** — `Bun.spawn()` for process spawning
-- **mlx_whisper** (system) — Local voice transcription on Apple Silicon
+- **Groq Whisper API** (external) — Cloud voice transcription with auto language detection
 - **ffmpeg** (system) — Audio format conversion (.oga → .wav)
 - **ElevenLabs API** (external) — Text-to-speech via eleven_v3 model
