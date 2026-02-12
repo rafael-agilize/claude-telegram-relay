@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 9 - Cron Engine
-Plan: 1 plan in 1 wave (09-01-PLAN.md)
+Phase: 10 - Cron Management
+Plan: 1 plan in 1 wave (PLAN.md)
 Status: Complete
-Last activity: 2026-02-12 -- Phase 9 executed (4/6 phases complete)
+Last activity: 2026-02-12 -- Phase 10 executed (5/6 phases complete)
 
-**Progress:** [█████████████░░░░░░░] 4/6 phases
+**Progress:** [████████████████░░░░] 5/6 phases
 
 ## Project Reference
 
@@ -22,7 +22,7 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 - Phases: 6 total (Phase 6-11)
 - Requirements: 24 total
 - Coverage: 24/24 (100%)
-- Completed: 4/6 phases
+- Completed: 5/6 phases
 - Started: 2026-02-12
 
 | Phase | Name | Duration | Tasks | Files | Status |
@@ -31,6 +31,7 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 | 7 | Heartbeat Core | 1m 54s | 4 | 3 | ✅ Complete |
 | 8 | Heartbeat Refinement | ~2m | 3 | 2 | ✅ Complete |
 | 9 | Cron Engine | ~2m | 2 | 3 | ✅ Complete |
+| 10 | Cron Management | ~2m | 3 | 3 | ✅ Complete |
 
 **Milestone 1 (archived):**
 - Phases: 5 total (Phase 1-5)
@@ -85,6 +86,21 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 - Lifecycle: startCronScheduler() in onStart, stopCronScheduler() in SIGINT/SIGTERM
 - croner v10.0.1 installed for 5-field cron expression parsing
 
+### From Phase 10 Implementation
+- /cron command: add, list, remove, enable, disable subcommands
+- detectScheduleType(): auto-classifies schedule strings into cron/interval/once
+- createCronJob(): inserts job with computed initial next_run_at
+- getAllCronJobs(): returns all jobs (enabled + disabled) for listing
+- deleteCronJob(): hard-deletes job from database
+- List uses numbered positions (not UUIDs) for usability
+- Schedule format: quoted schedule + prompt (e.g., /cron add "0 7 * * *" morning briefing)
+- HEARTBEAT.md cron sync: parseCronJobsFromChecklist() + syncCronJobsFromFile()
+- File-based cron definitions in ## Cron Jobs section (format: - "schedule" prompt)
+- Sync is idempotent: creates new, updates changed schedules, disables removed
+- source='file' distinguishes file-sourced jobs from user/agent
+- Migration: cron_jobs_source_check updated to include 'file'
+- Event types added: cron_created, cron_deleted
+
 ### Key Decisions for v1.1
 - Dedicated heartbeat thread in Telegram group (keeps proactive messages separate)
 - 1h default heartbeat interval (balance responsiveness vs API cost)
@@ -101,17 +117,21 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 5. **Phase 8: Triple fallback for heartbeat delivery** — Topic thread → DM (on topic error) → plain text (on HTML parse error). Ensures messages are never lost.
 6. **Phase 9: Sequential job execution** — Jobs execute sequentially within a tick to prevent concurrent Claude CLI calls. cronRunning guard prevents overlapping ticks.
 7. **Phase 9: Manual regex for interval/once** — croner only used for 5-field cron expressions. Interval ("every Xh Ym") and once ("in Xh Ym") parsed via simple regex.
+8. **Phase 10: Numbered position for job references** — /cron remove/enable/disable use list position (1-based) instead of UUIDs for usability from a phone keyboard.
+9. **Phase 10: File sync matched by prompt** — HEARTBEAT.md cron jobs matched to database by exact prompt text. Changed prompt = new job. Keeps sync deterministic.
+10. **Phase 10: Disabled not deleted on file removal** — File-sourced jobs removed from HEARTBEAT.md are disabled, not deleted. Preserves execution history and logs.
 
 ## Session Continuity
 
-**Next action:** Run `/gsd:plan-phase 10` to plan Cron Management (user-facing controls)
+**Next action:** Run `/gsd:plan-phase 11` to plan Agent Scheduling (Claude creates its own scheduled tasks via [CRON: ...] intent)
 
 **Context for next session:**
-- Phase 9 complete: cron engine fully functional with all 3 schedule types
-- Phase 10 will add Telegram commands (/cron add, /cron list, /cron remove) and HEARTBEAT.md cron definitions
-- Phase 11 will add agent self-scheduling via [CRON: ...] intent
+- Phase 10 complete: cron management fully functional with Telegram commands and file sync
+- Phase 11 will add [CRON: schedule | prompt] intent tag parsing in processIntents()
+- Phase 11 will add system prompt instructions for Claude about the CRON intent capability
+- All 3 cron sources will be functional: user (Telegram /cron), file (HEARTBEAT.md), agent ([CRON:] intent)
 
 ---
 
 *Created: 2026-02-12*
-*Last updated: 2026-02-12 after Phase 9 execution*
+*Last updated: 2026-02-12 after Phase 10 execution*

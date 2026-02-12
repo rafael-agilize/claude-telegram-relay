@@ -27,9 +27,13 @@ bun run setup:services # Configure external services (Groq, ElevenLabs)
 - `/soul <text>` — Set the bot's personality (loaded into every prompt)
 - `/new` — Reset the Claude session for the current thread (fresh conversation)
 - `/memory` — Show all learned facts about the user
+- `/cron list` — Show all scheduled cron jobs with status
+- `/cron add "<schedule>" <prompt>` — Create a new cron job (schedule types: cron "0 7 * * *", interval "every 2h", one-shot "in 20m")
+- `/cron remove <number>` — Remove a cron job by its list number
+- `/cron enable <number>` / `/cron disable <number>` — Toggle a cron job on/off
 
 **Heartbeat:**
-- `HEARTBEAT.md` — Checklist file in project root; Claude reads it on each heartbeat cycle and reports noteworthy items
+- `HEARTBEAT.md` — Checklist file in project root; Claude reads it on each heartbeat cycle and reports noteworthy items. Can also contain a `## Cron Jobs` section to define cron jobs declaratively (synced to database on each heartbeat)
 - `HEARTBEAT_OK` — When Claude responds with this token, the heartbeat message is suppressed (nothing to report)
 - Active hours: heartbeat only runs during configured window (default 08:00-22:00, timezone-aware)
 - Dedicated thread: heartbeat messages go to a "Heartbeat" forum topic in the group (auto-created)
@@ -67,12 +71,14 @@ tail -f ~/.claude-relay/relay-error.log
   - `[LEARN: fact]` → inserts into `global_memory` table
   - `[FORGET: search text]` → deletes matching fact from `global_memory`
   - `[VOICE_REPLY]` → triggers ElevenLabs TTS for the response
-- **Heartbeat & cron events** — Logged to `logs_v2` with event types: `heartbeat_tick`, `heartbeat_ok`, `heartbeat_delivered`, `heartbeat_dedup`, `heartbeat_skip`, `heartbeat_error`, `cron_executed`, `cron_delivered`, `cron_error`, `bot_stopping`
+- **Heartbeat & cron events** — Logged to `logs_v2` with event types: `heartbeat_tick`, `heartbeat_ok`, `heartbeat_delivered`, `heartbeat_dedup`, `heartbeat_skip`, `heartbeat_error`, `cron_created`, `cron_deleted`, `cron_executed`, `cron_delivered`, `cron_error`, `bot_stopping`
 - **Thread routing middleware** — Extracts `message_thread_id`, creates/finds thread in Supabase, attaches `threadInfo` to context
 - **callClaude()** — Spawns `claude -p "<prompt>" --resume <sessionId> --output-format json --dangerously-skip-permissions`. Parses JSON for response text and session ID. Auto-retries without `--resume` if session is expired/corrupt. 5-minute timeout.
 - **Heartbeat timer** — `heartbeatTick()` fires at configurable interval (default 60min), checks active hours window (timezone-aware), reads `HEARTBEAT.md` checklist, calls Claude, handles suppression (HEARTBEAT_OK + dedup), delivers to dedicated "Heartbeat" topic thread (falls back to DM). Starts on boot via `onStart`, stops on SIGINT/SIGTERM.
 - **Cron scheduler** — `cronTick()` fires every 60s, polls `cron_jobs` table for enabled jobs, checks `next_run_at` to determine due jobs. Supports three schedule types: `cron` (5-field via croner library), `interval` (e.g. "every 2h"), `once` (e.g. "in 20m"). Each execution spawns a Claude call with job prompt and thread context, delivers result to target thread or DM. One-shot jobs auto-disable after execution. Starts on boot via `onStart`, stops on SIGINT/SIGTERM.
 - **Cron scheduler engine** — `cronTick()`, `executeCronJob()`, `sendCronResultToTelegram()`, `computeNextRun()`, `isJobDue()`, `getThreadInfoForCronJob()`, `startCronScheduler()`, `stopCronScheduler()`
+- **Cron management** — `/cron` command handler (add/list/remove/enable/disable), `detectScheduleType()`, `createCronJob()`, `getAllCronJobs()`, `deleteCronJob()`
+- **HEARTBEAT.md cron sync** — `parseCronJobsFromChecklist()`, `syncCronJobsFromFile()` — file-based cron definitions synced on each heartbeat tick
 - **Thread summary generation** — `maybeUpdateThreadSummary()` triggers every 5 exchanges, makes a standalone Claude call to summarize the conversation
 - **Voice transcription** — `transcribeAudio()` converts .oga→.wav via ffmpeg, then sends to Groq Whisper API (auto-detects language)
 - **Text-to-speech** — `textToSpeech()` calls ElevenLabs v3 API, outputs opus format. Max 4500 chars per request.
@@ -112,12 +118,13 @@ Tables used by the relay:
 - `global_memory` — Cross-thread learned facts (content, source thread)
 - `bot_soul` — Personality definitions (content, is_active)
 - `logs_v2` — Observability events (event, message, metadata, thread_id)
-- `cron_jobs` — Scheduled jobs (name, schedule, prompt, target thread, source)
+- `cron_jobs` — Scheduled jobs (name, schedule, prompt, target thread, source: user/agent/file)
 - `heartbeat_config` — Single-row heartbeat settings (interval, active hours, timezone, enabled)
 
 Migrations:
 - `supabase/migrations/20260210202924_schema_v2_threads_memory_soul.sql` (v2: threads, memory, soul)
 - `supabase/migrations/20260212_heartbeat_cron_schema.sql` (v2.1: heartbeat config, cron jobs)
+- `supabase/migrations/20260212_2_add_file_source.sql` (v2.2: add 'file' source for cron jobs)
 
 Reference SQL: `examples/supabase-schema-v2.sql`
 

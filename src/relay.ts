@@ -482,7 +482,7 @@ interface CronJob {
   prompt: string;
   target_thread_id: string | null;
   enabled: boolean;
-  source: 'user' | 'agent';
+  source: 'user' | 'agent' | 'file';
   created_at: string;
   last_run_at: string | null;
   next_run_at: string | null;
@@ -541,6 +541,94 @@ async function disableCronJob(jobId: string): Promise<void> {
       .eq("id", jobId);
   } catch (e) {
     console.error("disableCronJob error:", e);
+  }
+}
+
+// ============================================================
+// SUPABASE v2.2: Cron Management helpers (Phase 10)
+// ============================================================
+
+function detectScheduleType(schedule: string): 'cron' | 'interval' | 'once' | null {
+  const trimmed = schedule.trim().toLowerCase();
+  if (trimmed.startsWith("every ")) return "interval";
+  if (trimmed.startsWith("in ")) return "once";
+  // Check for 5-field cron expression
+  const fields = trimmed.split(/\s+/);
+  if (fields.length === 5 && fields.every(f => /^[\d\*\/\-,]+$/.test(f))) return "cron";
+  return null;
+}
+
+async function createCronJob(
+  name: string,
+  schedule: string,
+  scheduleType: 'cron' | 'interval' | 'once',
+  prompt: string,
+  targetThreadId?: string,
+  source: 'user' | 'agent' | 'file' = 'user'
+): Promise<CronJob | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from("cron_jobs")
+      .insert({
+        name,
+        schedule,
+        schedule_type: scheduleType,
+        prompt,
+        target_thread_id: targetThreadId || null,
+        enabled: true,
+        source,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("createCronJob error:", error);
+      return null;
+    }
+
+    // Compute initial next_run_at
+    const job = data as CronJob;
+    const nextRun = computeNextRun(job);
+    if (nextRun) {
+      await supabase
+        .from("cron_jobs")
+        .update({ next_run_at: nextRun })
+        .eq("id", job.id);
+    }
+
+    return job;
+  } catch (e) {
+    console.error("createCronJob error:", e);
+    return null;
+  }
+}
+
+async function getAllCronJobs(): Promise<CronJob[]> {
+  if (!supabase) return [];
+  try {
+    const { data } = await supabase
+      .from("cron_jobs")
+      .select("*")
+      .order("created_at", { ascending: true });
+    return (data || []) as CronJob[];
+  } catch (e) {
+    console.error("getAllCronJobs error:", e);
+    return [];
+  }
+}
+
+async function deleteCronJob(jobId: string): Promise<boolean> {
+  if (!supabase) return false;
+  try {
+    const { error } = await supabase
+      .from("cron_jobs")
+      .delete()
+      .eq("id", jobId);
+    return !error;
+  } catch (e) {
+    console.error("deleteCronJob error:", e);
+    return false;
   }
 }
 
@@ -893,6 +981,9 @@ async function heartbeatTick(): Promise<void> {
       return;
     }
 
+    // Step 1.5: Sync cron jobs defined in HEARTBEAT.md
+    await syncCronJobsFromFile(checklist);
+
     // Step 2: Build prompt and call Claude (standalone, no --resume)
     const prompt = await buildHeartbeatPrompt(checklist);
     const { text: rawResponse } = await callClaude(prompt);
@@ -976,6 +1067,101 @@ async function readHeartbeatChecklist(): Promise<string> {
     return await readFile(heartbeatPath, "utf-8");
   } catch {
     return "";
+  }
+}
+
+function parseCronJobsFromChecklist(
+  checklist: string
+): Array<{ schedule: string; scheduleType: 'cron' | 'interval' | 'once'; prompt: string }> {
+  const results: Array<{ schedule: string; scheduleType: 'cron' | 'interval' | 'once'; prompt: string }> = [];
+
+  // Find the ## Cron Jobs or ## Cron section
+  const sectionMatch = checklist.match(/^##\s+Cron(?:\s+Jobs)?\s*\n([\s\S]*?)(?=\n##\s|\n---|$)/mi);
+  if (!sectionMatch) return results;
+
+  const section = sectionMatch[1];
+  const lines = section.split("\n");
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("- ")) continue;
+
+    // Parse: - "schedule" prompt
+    const match = trimmed.match(/^-\s+"([^"]+)"\s+(.+)$/);
+    if (!match) continue;
+
+    const schedule = match[1].trim();
+    const prompt = match[2].trim();
+
+    const scheduleType = detectScheduleType(schedule);
+    if (!scheduleType) continue;
+
+    results.push({ schedule, scheduleType, prompt });
+  }
+
+  return results;
+}
+
+async function syncCronJobsFromFile(checklist: string): Promise<void> {
+  if (!supabase) return;
+
+  const definitions = parseCronJobsFromChecklist(checklist);
+  if (definitions.length === 0) return;
+
+  try {
+    // Get existing file-sourced jobs
+    const { data: existingJobs } = await supabase
+      .from("cron_jobs")
+      .select("*")
+      .eq("source", "file");
+
+    const existing = (existingJobs || []) as CronJob[];
+
+    // Track which existing jobs are still in the file
+    const matchedIds = new Set<string>();
+
+    for (const def of definitions) {
+      // Find existing job by prompt (exact match)
+      const match = existing.find(j => j.prompt === def.prompt);
+
+      if (match) {
+        matchedIds.add(match.id);
+
+        // Update schedule if changed
+        if (match.schedule !== def.schedule || match.schedule_type !== def.scheduleType || !match.enabled) {
+          const updatedJob = { ...match, schedule: def.schedule, schedule_type: def.scheduleType };
+          const nextRun = computeNextRun(updatedJob as CronJob);
+          await supabase
+            .from("cron_jobs")
+            .update({
+              schedule: def.schedule,
+              schedule_type: def.scheduleType,
+              enabled: true,
+              next_run_at: nextRun,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", match.id);
+          console.log(`[Cron] File sync: updated job "${match.name}" schedule to ${def.schedule}`);
+        }
+      } else {
+        // Create new job
+        const name = def.prompt.split(/\s+/).slice(0, 4).join(" ");
+        const job = await createCronJob(name, def.schedule, def.scheduleType, def.prompt, undefined, "file");
+        if (job) {
+          console.log(`[Cron] File sync: created job "${name}" (${def.schedule})`);
+        }
+      }
+    }
+
+    // Disable file-sourced jobs that are no longer in the file
+    for (const job of existing) {
+      if (!matchedIds.has(job.id) && job.enabled) {
+        await disableCronJob(job.id);
+        console.log(`[Cron] File sync: disabled removed job "${job.name}"`);
+      }
+    }
+  } catch (e) {
+    console.error("[Cron] File sync error:", e);
   }
 }
 
@@ -1693,6 +1879,191 @@ bot.command("memory", async (ctx) => {
   text += "\n\nTo remove a fact, just ask me to forget it.";
 
   await sendResponse(ctx, text);
+});
+
+// /cron command: manage scheduled jobs
+bot.command("cron", async (ctx) => {
+  const args = (ctx.match || "").trim();
+
+  // /cron list (or just /cron with no args)
+  if (!args || args === "list") {
+    const jobs = await getAllCronJobs();
+    if (jobs.length === 0) {
+      await ctx.reply("No cron jobs found.\n\nUsage: /cron add \"<schedule>\" <prompt>");
+      return;
+    }
+
+    let text = `<b>Cron Jobs (${jobs.length})</b>\n\n`;
+    jobs.forEach((job, i) => {
+      const status = job.enabled ? "✅" : "⏸";
+      const nextRun = job.next_run_at
+        ? new Date(job.next_run_at).toLocaleString("en-US", {
+            timeZone: "America/Sao_Paulo",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "—";
+      text += `${status} <b>${i + 1}.</b> <code>${job.schedule}</code> (${job.schedule_type})\n`;
+      text += `   ${job.prompt.substring(0, 80)}${job.prompt.length > 80 ? "..." : ""}\n`;
+      text += `   Next: ${nextRun} · Source: ${job.source}\n\n`;
+    });
+
+    text += `Remove: /cron remove <number>\nAdd: /cron add "<schedule>" <prompt>`;
+
+    try {
+      await ctx.reply(text, { parse_mode: "HTML" });
+    } catch {
+      await ctx.reply(text.replace(/<[^>]*>/g, ""));
+    }
+    return;
+  }
+
+  // /cron add "<schedule>" <prompt>
+  if (args.startsWith("add ")) {
+    const addArgs = args.substring(4).trim();
+
+    // Parse: "schedule" prompt
+    const match = addArgs.match(/^"([^"]+)"\s+(.+)$/s);
+    if (!match) {
+      await ctx.reply(
+        'Usage: /cron add "<schedule>" <prompt>\n\n' +
+        'Examples:\n' +
+        '/cron add "0 7 * * *" morning briefing\n' +
+        '/cron add "every 2h" check project status\n' +
+        '/cron add "in 20m" remind me to call John'
+      );
+      return;
+    }
+
+    const schedule = match[1].trim();
+    const prompt = match[2].trim();
+
+    const scheduleType = detectScheduleType(schedule);
+    if (!scheduleType) {
+      await ctx.reply(
+        `Invalid schedule: "${schedule}"\n\n` +
+        "Supported formats:\n" +
+        "• Cron: 0 7 * * * (5-field)\n" +
+        "• Interval: every 2h, every 30m, every 1h30m\n" +
+        "• One-shot: in 20m, in 1h, in 2h30m"
+      );
+      return;
+    }
+
+    // Auto-generate name from first 4 words of prompt
+    const name = prompt.split(/\s+/).slice(0, 4).join(" ");
+
+    // Target thread: use current thread if in a topic, null for DM
+    const targetThreadId = ctx.threadInfo?.dbId || undefined;
+
+    const job = await createCronJob(name, schedule, scheduleType, prompt, targetThreadId);
+    if (job) {
+      const nextRun = computeNextRun(job);
+      const nextRunStr = nextRun
+        ? new Date(nextRun).toLocaleString("en-US", {
+            timeZone: "America/Sao_Paulo",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "computing...";
+
+      await logEventV2("cron_created", `Cron job created: ${name}`, {
+        job_id: job.id,
+        schedule,
+        schedule_type: scheduleType,
+        prompt: prompt.substring(0, 100),
+      }, ctx.threadInfo?.dbId);
+
+      await ctx.reply(
+        `✅ Cron job created!\n\n` +
+        `Schedule: ${schedule} (${scheduleType})\n` +
+        `Prompt: ${prompt}\n` +
+        `Next run: ${nextRunStr}`
+      );
+    } else {
+      await ctx.reply("Failed to create cron job. Check Supabase connection.");
+    }
+    return;
+  }
+
+  // /cron remove <number>
+  if (args.startsWith("remove ") || args.startsWith("rm ") || args.startsWith("delete ")) {
+    const numStr = args.split(/\s+/)[1];
+    const num = parseInt(numStr);
+    if (isNaN(num) || num < 1) {
+      await ctx.reply("Usage: /cron remove <number>\n\nUse /cron list to see job numbers.");
+      return;
+    }
+
+    // Fetch all jobs and find by position
+    const jobs = await getAllCronJobs();
+    if (num > jobs.length) {
+      await ctx.reply(`No job #${num}. You have ${jobs.length} job(s). Use /cron list to see them.`);
+      return;
+    }
+
+    const job = jobs[num - 1];
+    const deleted = await deleteCronJob(job.id);
+    if (deleted) {
+      await logEventV2("cron_deleted", `Cron job deleted: ${job.name}`, {
+        job_id: job.id,
+        schedule: job.schedule,
+      }, ctx.threadInfo?.dbId);
+
+      await ctx.reply(`🗑 Removed job #${num}: "${job.name}" (${job.schedule})`);
+    } else {
+      await ctx.reply("Failed to remove cron job. Check Supabase connection.");
+    }
+    return;
+  }
+
+  // /cron enable <number> / /cron disable <number>
+  if (args.startsWith("enable ") || args.startsWith("disable ")) {
+    const parts = args.split(/\s+/);
+    const action = parts[0];
+    const num = parseInt(parts[1]);
+    if (isNaN(num) || num < 1) {
+      await ctx.reply(`Usage: /cron ${action} <number>`);
+      return;
+    }
+
+    const jobs = await getAllCronJobs();
+    if (num > jobs.length) {
+      await ctx.reply(`No job #${num}. You have ${jobs.length} job(s).`);
+      return;
+    }
+
+    const job = jobs[num - 1];
+    const newEnabled = action === "enable";
+
+    if (!supabase) {
+      await ctx.reply("Supabase not connected.");
+      return;
+    }
+
+    await supabase
+      .from("cron_jobs")
+      .update({ enabled: newEnabled, updated_at: new Date().toISOString() })
+      .eq("id", job.id);
+
+    const emoji = newEnabled ? "▶️" : "⏸";
+    await ctx.reply(`${emoji} Job #${num} "${job.name}" ${newEnabled ? "enabled" : "disabled"}.`);
+    return;
+  }
+
+  // Unknown subcommand
+  await ctx.reply(
+    "Usage:\n" +
+    '/cron add "<schedule>" <prompt>\n' +
+    "/cron list\n" +
+    "/cron remove <number>\n" +
+    "/cron enable <number>\n" +
+    "/cron disable <number>"
+  );
 });
 
 // ============================================================
