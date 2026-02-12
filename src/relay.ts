@@ -749,9 +749,9 @@ async function sendCronResultToTelegram(
   const chatId = threadInfo ? threadInfo.chatId : parseInt(ALLOWED_USER_ID);
   const threadId = threadInfo?.threadId;
 
-  const prefix = `<b>[Cron: ${job.name}]</b>\n\n`;
-  const fullMessage = prefix + message;
-  const html = markdownToTelegramHtml(fullMessage);
+  const escapedName = job.name.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const prefix = `<b>[Cron: ${escapedName}]</b>\n\n`;
+  const html = prefix + markdownToTelegramHtml(message);
 
   const chunks: string[] = [];
   if (html.length <= 4000) {
@@ -1145,7 +1145,7 @@ async function syncCronJobsFromFile(checklist: string): Promise<void> {
         }
       } else {
         // Create new job
-        const name = def.prompt.split(/\s+/).slice(0, 4).join(" ");
+        const name = def.prompt.length <= 50 ? def.prompt : def.prompt.substring(0, 47) + "...";
         const job = await createCronJob(name, def.schedule, def.scheduleType, def.prompt, undefined, "file");
         if (job) {
           console.log(`[Cron] File sync: created job "${name}" (${def.schedule})`);
@@ -1404,7 +1404,7 @@ async function processIntents(response: string, threadDbId?: string): Promise<st
     if (schedule.length > 0 && prompt.length > 0 && prompt.length <= 500) {
       const scheduleType = detectScheduleType(schedule);
       if (scheduleType) {
-        const name = prompt.split(/\s+/).slice(0, 4).join(" ");
+        const name = prompt.length <= 50 ? prompt : prompt.substring(0, 47) + "...";
         const job = await createCronJob(name, schedule, scheduleType, prompt, threadDbId || undefined, "agent");
         if (job) {
           console.log(`[Agent] Created cron job: "${name}" (${schedule})`);
@@ -1983,8 +1983,8 @@ bot.command("cron", async (ctx) => {
       return;
     }
 
-    // Auto-generate name from first 4 words of prompt
-    const name = prompt.split(/\s+/).slice(0, 4).join(" ");
+    // Auto-generate name from prompt (truncate at 50 chars)
+    const name = prompt.length <= 50 ? prompt : prompt.substring(0, 47) + "...";
 
     // Target thread: use current thread if in a topic, null for DM
     const targetThreadId = ctx.threadInfo?.dbId || undefined;
