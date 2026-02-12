@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 6 - Schema & Infrastructure
-Plan: .planning/phases/6/PLAN.md
+Phase: 7 - Heartbeat Core
+Plan: .planning/phases/07-heartbeat-core/PLAN.md
 Status: Complete
-Last activity: 2026-02-12 -- Phase 6 executed (all 5 prompts)
+Last activity: 2026-02-12 -- Phase 7 executed (all 4 tasks)
 
-**Progress:** [███░░░░░░░░░░░░░░░░░] 1/6 phases
+**Progress:** [██████░░░░░░░░░░░░░░] 2/6 phases
 
 ## Project Reference
 
@@ -22,8 +22,13 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 - Phases: 6 total (Phase 6-11)
 - Requirements: 24 total
 - Coverage: 24/24 (100%)
-- Completed: 1/6 phases
+- Completed: 2/6 phases
 - Started: 2026-02-12
+
+| Phase | Name | Duration | Tasks | Files | Status |
+|-------|------|----------|-------|-------|--------|
+| 6 | Schema & Infrastructure | N/A | 5 | 2 | ✅ Complete |
+| 7 | Heartbeat Core | 1m 54s | 4 | 3 | ✅ Complete |
 
 **Milestone 1 (archived):**
 - Phases: 5 total (Phase 1-5)
@@ -47,6 +52,15 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 - Deduplication: identical heartbeat messages suppressed within 24h window
 - Agent scheduling: [CRON: ...] intent allows Claude to create its own jobs
 
+### From Phase 7 Implementation
+- Heartbeat loop fully functional: reads HEARTBEAT.md, calls Claude standalone, handles suppression
+- HEARTBEAT_OK detection: exact match OR substring (handles mixed responses)
+- 24h deduplication: queries logs_v2 for heartbeat_delivered events with matching message_text
+- Guard flag pattern: heartbeatRunning prevents overlapping calls if Claude takes longer than interval
+- Graceful degradation: missing HEARTBEAT.md → skip silently; Supabase down → fail open (deliver)
+- Intent processing in heartbeat: [LEARN:] and [FORGET:] work in heartbeat context
+- Event types: heartbeat_tick, heartbeat_ok, heartbeat_delivered, heartbeat_dedup, heartbeat_skip, heartbeat_error
+
 ### Key Decisions for v1.1
 - Dedicated heartbeat thread in Telegram group (keeps proactive messages separate)
 - 1h default heartbeat interval (balance responsiveness vs API cost)
@@ -54,18 +68,24 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 - Both Telegram commands + HEARTBEAT.md file for cron management (phone + power user access)
 - Agent can self-schedule via [CRON: ...] intent (true proactivity)
 
+## Decisions
+
+1. **Phase 7: heartbeatRunning guard flag** — Prevents overlapping heartbeat calls if Claude takes longer than interval. Uses finally block to ensure flag is always reset.
+2. **Phase 7: Fail-open deduplication** — If Supabase query fails, delivers message rather than suppressing to avoid losing legitimate messages.
+3. **Phase 7: HEARTBEAT_OK substring matching** — Detects HEARTBEAT_OK as exact match OR substring to handle cases where Claude includes token with other text.
+
 ## Session Continuity
 
-**Next action:** Run `/gsd:plan-phase 7` to plan Heartbeat Core (or Phase 9 Cron Engine in parallel)
+**Next action:** Run `/gsd:plan-phase 8` to plan Dedicated Heartbeat Thread (or Phase 9 Cron Engine in parallel)
 
 **Context for next session:**
-- Phase 6 complete: cron_jobs + heartbeat_config tables created, migration applied to Supabase
-- Supabase helpers added to relay.ts (getHeartbeatConfig, getEnabledCronJobs, updateCronJobLastRun, disableCronJob)
-- Heartbeat timer skeleton wired into relay lifecycle (starts on boot, stops on shutdown)
-- Heartbeat & cron event logging via logEventV2()
-- Next phases: 7 (Heartbeat Core) and 9 (Cron Engine) can be planned/executed in parallel
+- Phase 7 complete: Heartbeat loop fully implemented with HEARTBEAT.md reading, HEARTBEAT_OK suppression, 24h dedup, and Telegram delivery
+- HEARTBEAT.md created with default checklist (user can customize)
+- Helper functions: readHeartbeatChecklist(), buildHeartbeatPrompt(), isHeartbeatDuplicate(), sendHeartbeatToTelegram()
+- Heartbeat currently sends to user DM (Phase 8 will add dedicated thread in Telegram group)
+- Next phases: 8 (Dedicated Heartbeat Thread) requires Phase 7 complete; 9 (Cron Engine) can be done in parallel
 
 ---
 
 *Created: 2026-02-12*
-*Last updated: 2026-02-12 after Phase 6 execution*
+*Last updated: 2026-02-12 after Phase 7 execution*
