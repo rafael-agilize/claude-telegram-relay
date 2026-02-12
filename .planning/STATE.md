@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 9 - Cron Engine
-Plan: Not yet planned
-Status: Ready to plan
-Last activity: 2026-02-12 -- Phase 8 executed and verified (3/6 phases complete)
+Plan: 1 plan in 1 wave (09-01-PLAN.md)
+Status: Complete
+Last activity: 2026-02-12 -- Phase 9 executed (4/6 phases complete)
 
-**Progress:** [██████████░░░░░░░░░░] 3/6 phases
+**Progress:** [█████████████░░░░░░░] 4/6 phases
 
 ## Project Reference
 
@@ -22,7 +22,7 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 - Phases: 6 total (Phase 6-11)
 - Requirements: 24 total
 - Coverage: 24/24 (100%)
-- Completed: 3/6 phases
+- Completed: 4/6 phases
 - Started: 2026-02-12
 
 | Phase | Name | Duration | Tasks | Files | Status |
@@ -30,6 +30,7 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 | 6 | Schema & Infrastructure | N/A | 5 | 2 | ✅ Complete |
 | 7 | Heartbeat Core | 1m 54s | 4 | 3 | ✅ Complete |
 | 8 | Heartbeat Refinement | ~2m | 3 | 2 | ✅ Complete |
+| 9 | Cron Engine | ~2m | 2 | 3 | ✅ Complete |
 
 **Milestone 1 (archived):**
 - Phases: 5 total (Phase 1-5)
@@ -72,6 +73,18 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 - TELEGRAM_GROUP_ID env var controls routing (optional, falls back to DM)
 - Config re-read on each tick: Supabase changes take effect next cycle without restart
 
+### From Phase 9 Implementation
+- Cron engine: 8 functions added to relay.ts (cronTick, computeNextRun, isJobDue, getThreadInfoForCronJob, sendCronResultToTelegram, executeCronJob, startCronScheduler, stopCronScheduler)
+- Three schedule types: cron (5-field via croner), interval ("every 2h" regex), once ("in 20m" regex)
+- cronTick fires every 60s, polls cron_jobs table, checks next_run_at to determine due jobs
+- cronRunning guard prevents overlapping ticks (same pattern as heartbeatRunning)
+- executeCronJob: builds prompt with soul + memory + thread context, calls Claude, processes intents, delivers result
+- One-shot jobs auto-disable after execution
+- Cron results prefixed with [Cron: job_name] header for user clarity
+- Event types: cron_executed, cron_delivered, cron_error
+- Lifecycle: startCronScheduler() in onStart, stopCronScheduler() in SIGINT/SIGTERM
+- croner v10.0.1 installed for 5-field cron expression parsing
+
 ### Key Decisions for v1.1
 - Dedicated heartbeat thread in Telegram group (keeps proactive messages separate)
 - 1h default heartbeat interval (balance responsiveness vs API cost)
@@ -86,19 +99,19 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 3. **Phase 7: HEARTBEAT_OK substring matching** — Detects HEARTBEAT_OK as exact match OR substring to handle cases where Claude includes token with other text.
 4. **Phase 8: Module-level topic cache** — heartbeatTopicId cached to avoid Supabase lookup on every heartbeat tick. Reset on topic deletion.
 5. **Phase 8: Triple fallback for heartbeat delivery** — Topic thread → DM (on topic error) → plain text (on HTML parse error). Ensures messages are never lost.
+6. **Phase 9: Sequential job execution** — Jobs execute sequentially within a tick to prevent concurrent Claude CLI calls. cronRunning guard prevents overlapping ticks.
+7. **Phase 9: Manual regex for interval/once** — croner only used for 5-field cron expressions. Interval ("every Xh Ym") and once ("in Xh Ym") parsed via simple regex.
 
 ## Session Continuity
 
-**Next action:** Run `/gsd:plan-phase 9` to plan the cron engine
+**Next action:** Run `/gsd:plan-phase 10` to plan Cron Management (user-facing controls)
 
 **Context for next session:**
-- Heartbeat stack complete (Phases 6-8): schema, core loop, active hours, dedicated thread
-- Cron stack starts: Phase 9 (engine), Phase 10 (management), Phase 11 (agent scheduling)
-- cron_jobs table already exists from Phase 6 migration
-- croner library planned for 5-field cron expressions
-- Need: cron tick loop, job execution via Claude calls, one-shot/interval/cron schedule types
+- Phase 9 complete: cron engine fully functional with all 3 schedule types
+- Phase 10 will add Telegram commands (/cron add, /cron list, /cron remove) and HEARTBEAT.md cron definitions
+- Phase 11 will add agent self-scheduling via [CRON: ...] intent
 
 ---
 
 *Created: 2026-02-12*
-*Last updated: 2026-02-12 after Phase 8 execution*
+*Last updated: 2026-02-12 after Phase 9 execution*

@@ -15,6 +15,7 @@ import { spawn } from "bun";
 import { writeFile, mkdir, readFile, unlink, open, readdir } from "fs/promises";
 import { join, basename } from "path";
 import { createClient } from "@supabase/supabase-js";
+import { Cron } from "croner";
 
 // ============================================================
 // THREAD CONTEXT TYPES
@@ -482,6 +483,7 @@ interface CronJob {
   target_thread_id: string | null;
   enabled: boolean;
   source: 'user' | 'agent';
+  created_at: string;
   last_run_at: string | null;
   next_run_at: string | null;
 }
@@ -539,6 +541,313 @@ async function disableCronJob(jobId: string): Promise<void> {
       .eq("id", jobId);
   } catch (e) {
     console.error("disableCronJob error:", e);
+  }
+}
+
+// ============================================================
+// CRON SCHEDULER ENGINE (Phase 9)
+// ============================================================
+
+let cronTimer: Timer | null = null;
+let cronRunning = false;
+const CRON_TICK_INTERVAL_MS = 60 * 1000; // Check every 60 seconds
+
+function computeNextRun(job: CronJob): string | null {
+  const now = new Date();
+
+  if (job.schedule_type === "cron") {
+    try {
+      const cronInstance = new Cron(job.schedule);
+      const nextRun = cronInstance.nextRun();
+      return nextRun ? nextRun.toISOString() : null;
+    } catch (err) {
+      console.error(`[Cron] Invalid cron expression for job ${job.id} (${job.name}): ${job.schedule}`, err);
+      return null;
+    }
+  }
+
+  if (job.schedule_type === "interval") {
+    const match = job.schedule.match(/every\s+(?:(\d+)h)?(?:(\d+)m)?/i);
+    if (!match) {
+      console.error(`[Cron] Invalid interval format for job ${job.id}: ${job.schedule}`);
+      return null;
+    }
+    const hours = parseInt(match[1] || "0", 10);
+    const minutes = parseInt(match[2] || "0", 10);
+    const intervalMs = (hours * 60 + minutes) * 60 * 1000;
+
+    if (intervalMs === 0) {
+      console.error(`[Cron] Zero interval for job ${job.id}: ${job.schedule}`);
+      return null;
+    }
+
+    const baseTime = job.last_run_at ? new Date(job.last_run_at) : now;
+    const nextRun = new Date(baseTime.getTime() + intervalMs);
+    return nextRun.toISOString();
+  }
+
+  if (job.schedule_type === "once") {
+    const match = job.schedule.match(/in\s+(?:(\d+)h)?(?:(\d+)m)?/i);
+    if (!match) {
+      console.error(`[Cron] Invalid once format for job ${job.id}: ${job.schedule}`);
+      return null;
+    }
+    const hours = parseInt(match[1] || "0", 10);
+    const minutes = parseInt(match[2] || "0", 10);
+    const delayMs = (hours * 60 + minutes) * 60 * 1000;
+
+    if (delayMs === 0) {
+      console.error(`[Cron] Zero delay for one-shot job ${job.id}: ${job.schedule}`);
+      return null;
+    }
+
+    const scheduledTime = new Date(new Date(job.created_at).getTime() + delayMs);
+
+    // If scheduled time is in the past and job has never run, it's due now
+    if (scheduledTime < now && !job.last_run_at) {
+      return now.toISOString();
+    }
+
+    return scheduledTime.toISOString();
+  }
+
+  return null;
+}
+
+function isJobDue(job: CronJob): boolean {
+  const now = new Date();
+
+  if (job.next_run_at) {
+    return new Date(job.next_run_at) <= now;
+  }
+
+  // First time: compute next_run_at
+  const nextRun = computeNextRun(job);
+  if (!nextRun) return false;
+
+  return new Date(nextRun) <= now;
+}
+
+async function getThreadInfoForCronJob(job: CronJob): Promise<ThreadInfo | undefined> {
+  if (!job.target_thread_id) return undefined;
+
+  const { data, error } = await supabase!
+    .from("threads")
+    .select("*")
+    .eq("id", job.target_thread_id)
+    .single();
+
+  if (error || !data) {
+    console.error(`[Cron] Target thread not found for job ${job.id}:`, error);
+    return undefined;
+  }
+
+  return {
+    dbId: data.id,
+    chatId: data.telegram_chat_id,
+    threadId: data.telegram_thread_id,
+    title: data.title,
+    sessionId: data.claude_session_id,
+    summary: data.summary || "",
+    messageCount: data.message_count || 0,
+  };
+}
+
+async function sendCronResultToTelegram(
+  message: string,
+  job: CronJob,
+  threadInfo?: ThreadInfo
+): Promise<void> {
+  const chatId = threadInfo ? threadInfo.chatId : parseInt(ALLOWED_USER_ID);
+  const threadId = threadInfo?.threadId;
+
+  const prefix = `<b>[Cron: ${job.name}]</b>\n\n`;
+  const fullMessage = prefix + message;
+  const html = markdownToTelegramHtml(fullMessage);
+
+  const chunks: string[] = [];
+  if (html.length <= 4000) {
+    chunks.push(html);
+  } else {
+    const lines = html.split("\n");
+    let currentChunk = "";
+    for (const line of lines) {
+      if (currentChunk.length + line.length + 1 > 4000) {
+        chunks.push(currentChunk);
+        currentChunk = line;
+      } else {
+        currentChunk += (currentChunk ? "\n" : "") + line;
+      }
+    }
+    if (currentChunk) chunks.push(currentChunk);
+  }
+
+  for (const chunk of chunks) {
+    try {
+      await bot.api.sendMessage(chatId, chunk, {
+        parse_mode: "HTML",
+        message_thread_id: threadId,
+      });
+    } catch (err: any) {
+      if (err.description?.includes("can't parse entities")) {
+        const stripped = chunk.replace(/<[^>]*>/g, "");
+        await bot.api.sendMessage(chatId, stripped, { message_thread_id: threadId });
+      } else {
+        console.error("[Cron] Failed to send message:", err);
+      }
+    }
+  }
+}
+
+async function executeCronJob(job: CronJob): Promise<void> {
+  await logEventV2("cron_executed", `Cron job fired: ${job.name}`, {
+    job_id: job.id,
+    job_name: job.name,
+    schedule: job.schedule,
+    schedule_type: job.schedule_type,
+  });
+
+  const threadInfo = await getThreadInfoForCronJob(job);
+
+  // Build prompt
+  const soul = await getActiveSoul();
+  const globalMemory = await getGlobalMemory();
+
+  const timeZone = "America/Sao_Paulo";
+  const timeString = new Date().toLocaleString("en-US", {
+    timeZone,
+    dateStyle: "full",
+    timeStyle: "long",
+  });
+
+  let prompt = soul + `\n\nCurrent time: ${timeString}\n\n`;
+
+  if (globalMemory.length > 0) {
+    prompt += "THINGS I KNOW ABOUT THE USER:\n";
+    prompt += globalMemory.map((m) => `- ${m}`).join("\n");
+    prompt += "\n\n";
+  }
+
+  if (threadInfo && threadInfo.summary) {
+    prompt += `THREAD CONTEXT:\n${threadInfo.summary}\n\n`;
+  }
+
+  prompt += `SCHEDULED TASK:\n${job.prompt}`;
+
+  // Call Claude
+  let text = "";
+  let sessionId = threadInfo?.sessionId;
+
+  try {
+    const result = await callClaude(prompt, threadInfo);
+    text = result.text;
+    sessionId = result.sessionId;
+  } catch (err: any) {
+    await logEventV2("cron_error", `Cron execution failed for ${job.name}: ${err.message}`, {
+      job_id: job.id,
+      error: err.message,
+    });
+    return;
+  }
+
+  if (!text || text.trim() === "") {
+    await logEventV2("cron_error", `Cron job ${job.name} returned empty response`, {
+      job_id: job.id,
+    });
+    return;
+  }
+
+  // Update session if needed
+  if (threadInfo && sessionId && sessionId !== threadInfo.sessionId) {
+    await updateThreadSession(threadInfo.dbId, sessionId);
+  }
+
+  // Process intents
+  const cleanResponse = await processIntents(text, threadInfo?.dbId);
+
+  // Strip voice tags
+  const finalMessage = cleanResponse.replace(/\[VOICE_REPLY\]/gi, "").trim();
+
+  // Deliver
+  await sendCronResultToTelegram(finalMessage, job, threadInfo);
+
+  // Update next_run_at
+  const nextRun = computeNextRun(job);
+  await updateCronJobLastRun(job.id, nextRun || undefined);
+
+  // Auto-disable one-shot jobs
+  if (job.schedule_type === "once") {
+    await disableCronJob(job.id);
+  }
+
+  await logEventV2("cron_delivered", `Cron result delivered: ${job.name}`, {
+    job_id: job.id,
+    message_length: finalMessage.length,
+  });
+}
+
+async function cronTick(): Promise<void> {
+  // Guard against overlapping ticks
+  if (cronRunning) {
+    console.log("[Cron] Tick skipped (previous tick still running)");
+    return;
+  }
+
+  cronRunning = true;
+
+  try {
+    const jobs = await getEnabledCronJobs();
+
+    if (jobs.length === 0) {
+      return;
+    }
+
+    console.log(`[Cron] Tick: checking ${jobs.length} enabled job(s)`);
+
+    for (const job of jobs) {
+      try {
+        // Ensure next_run_at is computed
+        if (!job.next_run_at) {
+          const nextRun = computeNextRun(job);
+          if (nextRun) {
+            await updateCronJobLastRun(job.id, nextRun);
+            job.next_run_at = nextRun; // Update in-memory for this tick
+          } else {
+            console.error(`[Cron] Could not compute next_run_at for job ${job.id}`);
+            continue;
+          }
+        }
+
+        // Check if due
+        if (isJobDue(job)) {
+          console.log(`[Cron] Executing due job: ${job.name} (${job.id})`);
+          await executeCronJob(job);
+        }
+      } catch (err: any) {
+        await logEventV2("cron_error", `Cron tick error for job ${job.name}: ${err.message}`, {
+          job_id: job.id,
+          error: err.message,
+          stack: err.stack,
+        });
+        console.error(`[Cron] Error executing job ${job.id}:`, err);
+      }
+    }
+  } finally {
+    cronRunning = false;
+  }
+}
+
+function startCronScheduler(): void {
+  if (cronTimer) clearInterval(cronTimer);
+  cronTimer = setInterval(cronTick, CRON_TICK_INTERVAL_MS);
+  console.log("Cron scheduler: started (checking every 60s)");
+}
+
+function stopCronScheduler(): void {
+  if (cronTimer) {
+    clearInterval(cronTimer);
+    cronTimer = null;
+    console.log("Cron scheduler: stopped");
   }
 }
 
@@ -1058,12 +1367,14 @@ process.on("exit", () => {
 });
 process.on("SIGINT", async () => {
   stopHeartbeat();
+  stopCronScheduler();
   await logEventV2("bot_stopping", "Relay shutting down (SIGINT)");
   await releaseLock();
   process.exit(0);
 });
 process.on("SIGTERM", async () => {
   stopHeartbeat();
+  stopCronScheduler();
   await logEventV2("bot_stopping", "Relay shutting down (SIGTERM)");
   await releaseLock();
   process.exit(0);
@@ -1764,5 +2075,8 @@ bot.start({
     } else {
       console.log("Heartbeat: disabled (no config or not enabled)");
     }
+
+    // Start cron scheduler
+    startCronScheduler();
   },
 });

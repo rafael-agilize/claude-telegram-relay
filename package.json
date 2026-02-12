@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
+    "croner": "^10.0.1",
     "grammy": "^1.37.1"
   },
   "devDependencies": {

@@ -67,10 +67,12 @@ tail -f ~/.claude-relay/relay-error.log
   - `[LEARN: fact]` → inserts into `global_memory` table
   - `[FORGET: search text]` → deletes matching fact from `global_memory`
   - `[VOICE_REPLY]` → triggers ElevenLabs TTS for the response
-- **Heartbeat & cron events** — Logged to `logs_v2` with event types: `heartbeat_tick`, `heartbeat_ok`, `heartbeat_delivered`, `heartbeat_dedup`, `heartbeat_skip`, `heartbeat_error`, `cron_executed`, `cron_error`, `bot_stopping`
+- **Heartbeat & cron events** — Logged to `logs_v2` with event types: `heartbeat_tick`, `heartbeat_ok`, `heartbeat_delivered`, `heartbeat_dedup`, `heartbeat_skip`, `heartbeat_error`, `cron_executed`, `cron_delivered`, `cron_error`, `bot_stopping`
 - **Thread routing middleware** — Extracts `message_thread_id`, creates/finds thread in Supabase, attaches `threadInfo` to context
 - **callClaude()** — Spawns `claude -p "<prompt>" --resume <sessionId> --output-format json --dangerously-skip-permissions`. Parses JSON for response text and session ID. Auto-retries without `--resume` if session is expired/corrupt. 5-minute timeout.
 - **Heartbeat timer** — `heartbeatTick()` fires at configurable interval (default 60min), checks active hours window (timezone-aware), reads `HEARTBEAT.md` checklist, calls Claude, handles suppression (HEARTBEAT_OK + dedup), delivers to dedicated "Heartbeat" topic thread (falls back to DM). Starts on boot via `onStart`, stops on SIGINT/SIGTERM.
+- **Cron scheduler** — `cronTick()` fires every 60s, polls `cron_jobs` table for enabled jobs, checks `next_run_at` to determine due jobs. Supports three schedule types: `cron` (5-field via croner library), `interval` (e.g. "every 2h"), `once` (e.g. "in 20m"). Each execution spawns a Claude call with job prompt and thread context, delivers result to target thread or DM. One-shot jobs auto-disable after execution. Starts on boot via `onStart`, stops on SIGINT/SIGTERM.
+- **Cron scheduler engine** — `cronTick()`, `executeCronJob()`, `sendCronResultToTelegram()`, `computeNextRun()`, `isJobDue()`, `getThreadInfoForCronJob()`, `startCronScheduler()`, `stopCronScheduler()`
 - **Thread summary generation** — `maybeUpdateThreadSummary()` triggers every 5 exchanges, makes a standalone Claude call to summarize the conversation
 - **Voice transcription** — `transcribeAudio()` converts .oga→.wav via ffmpeg, then sends to Groq Whisper API (auto-detects language)
 - **Text-to-speech** — `textToSpeech()` calls ElevenLabs v3 API, outputs opus format. Max 4500 chars per request.
@@ -162,3 +164,4 @@ Note: Session state is stored per-thread in Supabase (`threads.claude_session_id
 - **Groq Whisper API** (external) — Cloud voice transcription with auto language detection
 - **ffmpeg** (system) — Audio format conversion (.oga → .wav)
 - **ElevenLabs API** (external) — Text-to-speech via eleven_v3 model
+- **croner** ^9+ — Cron expression parser for 5-field cron schedules with timezone support
