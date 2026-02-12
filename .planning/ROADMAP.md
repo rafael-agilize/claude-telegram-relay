@@ -15,7 +15,7 @@
 | Phase | Goal | Requirements | Status |
 |-------|------|--------------|--------|
 | 6 - Schema & Infrastructure | Database foundation for heartbeat and cron | INFRA-01, INFRA-02, INFRA-03, INFRA-04 | Done |
-| 7 - Heartbeat Core | Periodic agent loop with smart suppression | HB-01, HB-02, HB-03, HB-06 | Pending |
+| 7 - Heartbeat Core | Periodic agent loop with smart suppression | HB-01, HB-02, HB-03, HB-06 | Done |
 | 8 - Heartbeat Refinement | Active hours, dedicated thread, config | HB-04, HB-05, HB-07 | Pending |
 | 9 - Cron Engine | Scheduled job execution system | CRON-01, CRON-02, CRON-03, CRON-04, CRON-05, CRON-06 | Pending |
 | 10 - Cron Management | User-facing controls via Telegram and files | CMGMT-01, CMGMT-02, CMGMT-03, CMGMT-04 | Pending |
