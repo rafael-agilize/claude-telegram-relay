@@ -1275,6 +1275,7 @@ If there IS something worth reporting (something changed, something needs attent
 You may use these tags in your response:
 [LEARN: concise fact about the user] — save a fact (under 15 words)
 [FORGET: search text matching the fact to remove] — remove a previously learned fact
+[CRON: <schedule> | <prompt>] — schedule a follow-up task (e.g., [CRON: in 1h | re-check deployment status])
 
 Do NOT use [VOICE_REPLY] in heartbeat responses.`;
 
@@ -1390,6 +1391,36 @@ async function processIntents(response: string, threadDbId?: string): Promise<st
     const deleted = await deleteGlobalMemory(searchText);
     if (deleted) {
       console.log(`Forgot memory matching: ${searchText}`);
+    }
+    clean = clean.replace(match[0], "");
+  }
+
+  // [CRON: schedule | prompt] — agent self-scheduling
+  const cronMatches = response.matchAll(/\[CRON:\s*(.+?)\s*\|\s*(.+?)\]/gi);
+  for (const match of cronMatches) {
+    const schedule = match[1].trim();
+    const prompt = match[2].trim();
+
+    if (schedule.length > 0 && prompt.length > 0 && prompt.length <= 500) {
+      const scheduleType = detectScheduleType(schedule);
+      if (scheduleType) {
+        const name = prompt.split(/\s+/).slice(0, 4).join(" ");
+        const job = await createCronJob(name, schedule, scheduleType, prompt, threadDbId || undefined, "agent");
+        if (job) {
+          console.log(`[Agent] Created cron job: "${name}" (${schedule})`);
+          await logEventV2("cron_created", `Agent created cron job: ${name}`, {
+            job_id: job.id,
+            schedule,
+            schedule_type: scheduleType,
+            prompt: prompt.substring(0, 100),
+            source: "agent",
+          }, threadDbId);
+        }
+      } else {
+        console.warn(`[Agent] Invalid schedule in CRON intent: "${schedule}"`);
+      }
+    } else {
+      console.warn(`[Agent] Rejected CRON intent: schedule="${schedule}" prompt length=${prompt.length}`);
     }
     clean = clean.replace(match[0], "");
   }
@@ -2308,6 +2339,23 @@ To remove an outdated or wrong fact:
 
 To trigger a voice reply:
 [VOICE_REPLY]
+
+SCHEDULING:
+You can create scheduled tasks that will run automatically. Include this tag in your response:
+
+[CRON: <schedule> | <prompt>]
+
+Schedule formats:
+- Cron: "0 9 * * *" (5-field, e.g., daily at 9am)
+- Interval: "every 2h" or "every 30m" (recurring)
+- One-shot: "in 20m" or "in 1h" (runs once then auto-disables)
+
+Examples:
+[CRON: 0 9 * * 1 | check project deadlines and report status]
+[CRON: every 4h | check if user has any pending reminders]
+[CRON: in 30m | remind user about the meeting]
+
+Use this when the user asks you to remind them of something, schedule periodic checks, or when you identify something that should be monitored regularly. The tag will be removed before delivery.
 
 User: ${userMessage}`;
 

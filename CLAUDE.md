@@ -71,6 +71,7 @@ tail -f ~/.claude-relay/relay-error.log
   - `[LEARN: fact]` → inserts into `global_memory` table
   - `[FORGET: search text]` → deletes matching fact from `global_memory`
   - `[VOICE_REPLY]` → triggers ElevenLabs TTS for the response
+  - `[CRON: schedule | prompt]` → creates a scheduled cron job with source='agent'
 - **Heartbeat & cron events** — Logged to `logs_v2` with event types: `heartbeat_tick`, `heartbeat_ok`, `heartbeat_delivered`, `heartbeat_dedup`, `heartbeat_skip`, `heartbeat_error`, `cron_created`, `cron_deleted`, `cron_executed`, `cron_delivered`, `cron_error`, `bot_stopping`
 - **Thread routing middleware** — Extracts `message_thread_id`, creates/finds thread in Supabase, attaches `threadInfo` to context
 - **callClaude()** — Spawns `claude -p "<prompt>" --resume <sessionId> --output-format json --dangerously-skip-permissions`. Parses JSON for response text and session ID. Auto-retries without `--resume` if session is expired/corrupt. 5-minute timeout.

@@ -19,7 +19,7 @@
 | 8 - Heartbeat Refinement | Active hours, dedicated thread, config | HB-04, HB-05, HB-07 | Done |
 | 9 - Cron Engine | Scheduled job execution system | CRON-01, CRON-02, CRON-03, CRON-04, CRON-05, CRON-06 | Done |
 | 10 - Cron Management | User-facing controls via Telegram and files | CMGMT-01, CMGMT-02, CMGMT-03, CMGMT-04 | Done |
-| 11 - Agent Scheduling | Claude creates its own reminders | AGENT-01, AGENT-02, AGENT-03 | Pending |
+| 11 - Agent Scheduling | Claude creates its own reminders | AGENT-01, AGENT-02, AGENT-03 | Done |
 
 ---
 
@@ -186,4 +186,4 @@ All 24 v1.1 requirements mapped:
 ---
 
 *Roadmap created: 2026-02-12*
-*Last updated: 2026-02-12 — Phase 10 complete*
+*Last updated: 2026-02-12 — Phase 11 complete, milestone v1.1 done*

@@ -2,19 +2,19 @@
 
 ## Current Position
 
-Phase: 10 - Cron Management
+Phase: 11 - Agent Scheduling
 Plan: 1 plan in 1 wave (PLAN.md)
 Status: Complete
-Last activity: 2026-02-12 -- Phase 10 executed (5/6 phases complete)
+Last activity: 2026-02-12 -- Phase 11 executed (6/6 phases complete, milestone v1.1 done)
 
-**Progress:** [████████████████░░░░] 5/6 phases
+**Progress:** [████████████████████] 6/6 phases
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** Proactive agent that checks in and schedules tasks without waiting for user input
-**Current focus:** Milestone v1.1 -- Heartbeat & Proactive Agent
+**Current focus:** Milestone v1.1 -- Heartbeat & Proactive Agent (COMPLETE)
 
 ## Performance Metrics
 
@@ -22,7 +22,7 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 - Phases: 6 total (Phase 6-11)
 - Requirements: 24 total
 - Coverage: 24/24 (100%)
-- Completed: 5/6 phases
+- Completed: 6/6 phases
 - Started: 2026-02-12
 
 | Phase | Name | Duration | Tasks | Files | Status |
@@ -32,6 +32,7 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 | 8 | Heartbeat Refinement | ~2m | 3 | 2 | ✅ Complete |
 | 9 | Cron Engine | ~2m | 2 | 3 | ✅ Complete |
 | 10 | Cron Management | ~2m | 3 | 3 | ✅ Complete |
+| 11 | Agent Scheduling | ~2m | 3 | 2 | ✅ Complete |
 
 **Milestone 1 (archived):**
 - Phases: 5 total (Phase 1-5)
@@ -44,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 - Relay architecture: single-file relay.ts (~730 lines), Bun runtime
 - Threading: per-thread Claude sessions via --resume, stored in Supabase
 - Memory: soul + global_memory + thread summary + recent messages
-- Intent system: [LEARN:], [FORGET:], [VOICE_REPLY] parsed in processIntents()
+- Intent system: [LEARN:], [FORGET:], [VOICE_REPLY], [CRON:] parsed in processIntents()
 - Voice: Groq Whisper transcription + ElevenLabs TTS
 - Schema: threads, thread_messages, global_memory, bot_soul, logs_v2 tables
 
@@ -101,6 +102,15 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 - Migration: cron_jobs_source_check updated to include 'file'
 - Event types added: cron_created, cron_deleted
 
+### From Phase 11 Implementation
+- [CRON: schedule | prompt] intent tag parsing in processIntents()
+- Regex: \[CRON:\s*(.+?)\s*\|\s*(.+?)\] captures schedule and prompt
+- Uses existing detectScheduleType() and createCronJob() with source='agent'
+- Prompt length capped at 500 chars for security
+- buildPrompt() has full SCHEDULING section with syntax, formats, and examples
+- buildHeartbeatPrompt() has compact one-line CRON intent mention
+- Three cron sources complete: user (/cron), file (HEARTBEAT.md), agent ([CRON:] intent)
+
 ### Key Decisions for v1.1
 - Dedicated heartbeat thread in Telegram group (keeps proactive messages separate)
 - 1h default heartbeat interval (balance responsiveness vs API cost)
@@ -120,18 +130,18 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 8. **Phase 10: Numbered position for job references** — /cron remove/enable/disable use list position (1-based) instead of UUIDs for usability from a phone keyboard.
 9. **Phase 10: File sync matched by prompt** — HEARTBEAT.md cron jobs matched to database by exact prompt text. Changed prompt = new job. Keeps sync deterministic.
 10. **Phase 10: Disabled not deleted on file removal** — File-sourced jobs removed from HEARTBEAT.md are disabled, not deleted. Preserves execution history and logs.
+11. **Phase 11: Prompt length cap** — CRON intent prompt capped at 500 chars to prevent abuse while being generous enough for real use cases.
 
 ## Session Continuity
 
-**Next action:** Run `/gsd:plan-phase 11` to plan Agent Scheduling (Claude creates its own scheduled tasks via [CRON: ...] intent)
+**Next action:** Run `/gsd:complete-milestone` to archive milestone v1.1
 
 **Context for next session:**
-- Phase 10 complete: cron management fully functional with Telegram commands and file sync
-- Phase 11 will add [CRON: schedule | prompt] intent tag parsing in processIntents()
-- Phase 11 will add system prompt instructions for Claude about the CRON intent capability
-- All 3 cron sources will be functional: user (Telegram /cron), file (HEARTBEAT.md), agent ([CRON:] intent)
+- All 6 phases complete, all 24 requirements delivered
+- Milestone v1.1 delivers: heartbeat, cron engine, cron management, agent scheduling
+- Ready for milestone archival and planning next milestone
 
 ---
 
 *Created: 2026-02-12*
-*Last updated: 2026-02-12 after Phase 10 execution*
+*Last updated: 2026-02-12 after Phase 11 execution*
