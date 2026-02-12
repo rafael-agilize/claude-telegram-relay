@@ -657,6 +657,9 @@ function stopHeartbeat(): void {
 // Guard: prevent overlapping heartbeat calls
 let heartbeatRunning = false;
 
+// Cache for heartbeat topic thread ID (persisted in Supabase threads table)
+let heartbeatTopicId: number | null = null;
+
 async function readHeartbeatChecklist(): Promise<string> {
   if (!PROJECT_DIR) return "";
   try {
@@ -690,6 +693,52 @@ function isWithinActiveHours(config: HeartbeatConfig): boolean {
   }
   // Overnight range (e.g., 22:00-06:00)
   return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+}
+
+async function getOrCreateHeartbeatTopic(): Promise<{ chatId: number; threadId: number } | null> {
+  if (!TELEGRAM_GROUP_ID) return null;
+
+  const chatId = parseInt(TELEGRAM_GROUP_ID);
+  if (isNaN(chatId)) return null;
+
+  // Return cached value
+  if (heartbeatTopicId) return { chatId, threadId: heartbeatTopicId };
+
+  // Check Supabase for existing heartbeat thread
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from("threads")
+        .select("telegram_thread_id")
+        .eq("telegram_chat_id", chatId)
+        .eq("title", "Heartbeat")
+        .not("telegram_thread_id", "is", null)
+        .limit(1)
+        .single();
+
+      if (data?.telegram_thread_id) {
+        heartbeatTopicId = data.telegram_thread_id;
+        return { chatId, threadId: heartbeatTopicId };
+      }
+    } catch {
+      // No existing thread found — will create one
+    }
+  }
+
+  // Create new forum topic
+  try {
+    const topic = await bot.api.createForumTopic(chatId, "Heartbeat");
+    heartbeatTopicId = topic.message_thread_id;
+
+    // Persist in Supabase threads table
+    await getOrCreateThread(chatId, heartbeatTopicId, "Heartbeat");
+
+    console.log(`Heartbeat: created forum topic (thread_id: ${heartbeatTopicId})`);
+    return { chatId, threadId: heartbeatTopicId };
+  } catch (e) {
+    console.error("Failed to create heartbeat topic:", e);
+    return null; // Fall back to DM
+  }
 }
 
 async function buildHeartbeatPrompt(checklist: string): Promise<string> {
@@ -762,9 +811,13 @@ async function isHeartbeatDuplicate(message: string): Promise<boolean> {
 }
 
 async function sendHeartbeatToTelegram(message: string): Promise<void> {
-  const chatId = parseInt(ALLOWED_USER_ID);
+  // Try dedicated topic thread first, fall back to DM
+  const topic = await getOrCreateHeartbeatTopic();
+
+  const chatId = topic?.chatId || parseInt(ALLOWED_USER_ID);
+  const threadId = topic?.threadId;
   if (!chatId || isNaN(chatId)) {
-    console.error("Heartbeat: cannot send — TELEGRAM_USER_ID not set or invalid");
+    console.error("Heartbeat: cannot send — no valid chat ID");
     return;
   }
 
@@ -773,10 +826,27 @@ async function sendHeartbeatToTelegram(message: string): Promise<void> {
 
   const sendChunk = async (chunk: string) => {
     try {
-      await bot.api.sendMessage(chatId, chunk, { parse_mode: "HTML" });
+      await bot.api.sendMessage(chatId, chunk, {
+        parse_mode: "HTML",
+        message_thread_id: threadId,
+      });
     } catch (err: any) {
+      if (threadId && err.message?.includes("thread not found")) {
+        // Topic was deleted — reset cache, re-send same HTML chunk to DM
+        heartbeatTopicId = null;
+        console.warn("Heartbeat topic was deleted, falling back to DM");
+        try {
+          await bot.api.sendMessage(parseInt(ALLOWED_USER_ID), chunk, { parse_mode: "HTML" });
+        } catch {
+          await bot.api.sendMessage(parseInt(ALLOWED_USER_ID), chunk.replace(/<[^>]+>/g, ""));
+        }
+        return;
+      }
+      // HTML parse failure — send as plain text (strip tags from HTML chunk)
       console.warn("Heartbeat HTML parse failed, falling back to plain text:", err.message);
-      await bot.api.sendMessage(chatId, message.length <= MAX_LENGTH ? message : chunk);
+      await bot.api.sendMessage(chatId, chunk.replace(/<[^>]+>/g, ""), {
+        message_thread_id: threadId,
+      });
     }
   };
 
@@ -1667,6 +1737,7 @@ console.log(`Whisper model: ${GROQ_WHISPER_MODEL}`);
 console.log(`Voice responses (TTS): ${ELEVENLABS_API_KEY ? "ElevenLabs v3" : "disabled"}`);
 console.log("Thread support: enabled (Grammy auto-thread)");
 console.log(`Heartbeat: ${supabase ? "will start after boot" : "disabled (no Supabase)"}`);
+console.log(`Heartbeat routing: ${TELEGRAM_GROUP_ID ? `group ${TELEGRAM_GROUP_ID} (topic thread)` : "DM (no TELEGRAM_GROUP_ID)"}`);
 
 await logEventV2("bot_started", "Relay started");
 
