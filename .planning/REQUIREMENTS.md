@@ -77,36 +77,36 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HB-01 | -- | Pending |
-| HB-02 | -- | Pending |
-| HB-03 | -- | Pending |
-| HB-04 | -- | Pending |
-| HB-05 | -- | Pending |
-| HB-06 | -- | Pending |
-| HB-07 | -- | Pending |
-| CRON-01 | -- | Pending |
-| CRON-02 | -- | Pending |
-| CRON-03 | -- | Pending |
-| CRON-04 | -- | Pending |
-| CRON-05 | -- | Pending |
-| CRON-06 | -- | Pending |
-| CMGMT-01 | -- | Pending |
-| CMGMT-02 | -- | Pending |
-| CMGMT-03 | -- | Pending |
-| CMGMT-04 | -- | Pending |
-| AGENT-01 | -- | Pending |
-| AGENT-02 | -- | Pending |
-| AGENT-03 | -- | Pending |
-| INFRA-01 | -- | Pending |
-| INFRA-02 | -- | Pending |
-| INFRA-03 | -- | Pending |
-| INFRA-04 | -- | Pending |
+| INFRA-01 | Phase 6 | Pending |
+| INFRA-02 | Phase 6 | Pending |
+| INFRA-03 | Phase 6 | Pending |
+| INFRA-04 | Phase 6 | Pending |
+| HB-01 | Phase 7 | Pending |
+| HB-02 | Phase 7 | Pending |
+| HB-03 | Phase 7 | Pending |
+| HB-06 | Phase 7 | Pending |
+| HB-04 | Phase 8 | Pending |
+| HB-05 | Phase 8 | Pending |
+| HB-07 | Phase 8 | Pending |
+| CRON-01 | Phase 9 | Pending |
+| CRON-02 | Phase 9 | Pending |
+| CRON-03 | Phase 9 | Pending |
+| CRON-04 | Phase 9 | Pending |
+| CRON-05 | Phase 9 | Pending |
+| CRON-06 | Phase 9 | Pending |
+| CMGMT-01 | Phase 10 | Pending |
+| CMGMT-02 | Phase 10 | Pending |
+| CMGMT-03 | Phase 10 | Pending |
+| CMGMT-04 | Phase 10 | Pending |
+| AGENT-01 | Phase 11 | Pending |
+| AGENT-02 | Phase 11 | Pending |
+| AGENT-03 | Phase 11 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24
+- Mapped to phases: 24/24 (100%)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-12*
-*Last updated: 2026-02-12 after initial definition*
+*Last updated: 2026-02-12 after roadmap creation*
