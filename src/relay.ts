@@ -67,7 +67,7 @@ function sanitizeFilename(name: string): string {
 }
 
 // Claude CLI limits
-const CLAUDE_INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 min of no output = stuck
+const CLAUDE_INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 min of no output = stuck
 const MAX_OUTPUT_SIZE = 1024 * 1024; // 1MB
 
 // Kill orphaned child processes left behind after Claude CLI timeout.
@@ -1774,10 +1774,10 @@ async function callClaude(
     const exitCode = await proc.exited;
 
     if (timedOut) {
-      console.error("Claude CLI timed out (no activity for 5 minutes)");
+      console.error("Claude CLI timed out (no activity for 15 minutes)");
       // Clean up any orphaned child processes (skill scripts, auth flows, etc.)
       await killOrphanedProcesses(proc.pid!);
-      return { text: "Sorry, Claude appears to be stuck (no activity for 5 minutes). Please try again.", sessionId: null };
+      return { text: "Sorry, Claude appears to be stuck (no activity for 15 minutes). Please try again.", sessionId: null };
     }
 
     if (exitCode !== 0) {
@@ -1918,7 +1918,9 @@ bot.command("cron", async (ctx) => {
 
   // /cron list (or just /cron with no args)
   if (!args || args === "list") {
-    const jobs = await getAllCronJobs();
+    const allJobs = await getAllCronJobs();
+    // Hide disabled one-shot jobs (already executed, just clutter)
+    const jobs = allJobs.filter(j => !(j.schedule_type === "once" && !j.enabled));
     if (jobs.length === 0) {
       await ctx.reply("No cron jobs found.\n\nUsage: /cron add \"<schedule>\" <prompt>");
       return;
@@ -2030,8 +2032,9 @@ bot.command("cron", async (ctx) => {
       return;
     }
 
-    // Fetch all jobs and find by position
-    const jobs = await getAllCronJobs();
+    // Fetch jobs with same filter as /cron list (hide expired one-shots)
+    const allJobsR = await getAllCronJobs();
+    const jobs = allJobsR.filter(j => !(j.schedule_type === "once" && !j.enabled));
     if (num > jobs.length) {
       await ctx.reply(`No job #${num}. You have ${jobs.length} job(s). Use /cron list to see them.`);
       return;
@@ -2062,7 +2065,8 @@ bot.command("cron", async (ctx) => {
       return;
     }
 
-    const jobs = await getAllCronJobs();
+    const allJobsE = await getAllCronJobs();
+    const jobs = allJobsE.filter(j => !(j.schedule_type === "once" && !j.enabled));
     if (num > jobs.length) {
       await ctx.reply(`No job #${num}. You have ${jobs.length} job(s).`);
       return;
