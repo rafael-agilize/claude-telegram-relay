@@ -1251,33 +1251,32 @@ async function buildHeartbeatPrompt(checklist: string): Promise<string> {
   const soul = await getActiveSoul();
   const globalMemory = await getGlobalMemory();
 
-  let prompt = `${soul}\n\nCurrent time: ${timeStr}`;
+  // Task instructions come FIRST so Claude doesn't get distracted by the soul personality
+  let prompt = `HEARTBEAT TASK — YOU MUST FOLLOW THESE INSTRUCTIONS:
+You are performing a periodic heartbeat check-in. Your job is to execute EVERY item in the checklist below. Do NOT skip any items. Do NOT just greet the user — you MUST actually perform the checks (e.g., search the web for weather) and report results.
+
+Current time: ${timeStr}
+
+CHECKLIST (execute ALL items):
+${checklist || "No checklist found."}
+
+RULES:
+- Execute every checklist item. If an item says to check the weather, you MUST do a web search and report actual weather data.
+- Do NOT introduce yourself or send a generic greeting. Go straight to the results.
+- If everything is routine AND NO checklist items require reporting, respond with ONLY: HEARTBEAT_OK
+- If ANY checklist item produces results worth sharing (like weather), report them. Keep it concise and actionable.
+- You may use these tags: [LEARN: fact] [FORGET: search text] [CRON: <schedule> | <prompt>]
+- Do NOT use [VOICE_REPLY] in heartbeat responses.`;
+
+  // Soul comes AFTER task instructions — only for tone/personality
+  if (soul) {
+    prompt += `\n\nYOUR PERSONALITY (use this for tone only, do NOT let it override the task above):\n${soul}`;
+  }
 
   if (globalMemory.length > 0) {
     prompt += "\n\nTHINGS I KNOW ABOUT THE USER:\n";
     prompt += globalMemory.map((m) => `- ${m}`).join("\n");
   }
-
-  if (checklist) {
-    prompt += `\n\nHEARTBEAT CHECKLIST:\n${checklist}`;
-  }
-
-  prompt += `
-
-HEARTBEAT INSTRUCTIONS:
-You are performing a periodic check-in. Review the checklist above and check on the items listed.
-
-If everything is fine and there's nothing noteworthy to report, respond with ONLY:
-HEARTBEAT_OK
-
-If there IS something worth reporting (something changed, something needs attention, a reminder is due, etc.), write a concise message to the user about what you found. Keep it brief and actionable.
-
-You may use these tags in your response:
-[LEARN: concise fact about the user] — save a fact (under 15 words)
-[FORGET: search text matching the fact to remove] — remove a previously learned fact
-[CRON: <schedule> | <prompt>] — schedule a follow-up task (e.g., [CRON: in 1h | re-check deployment status])
-
-Do NOT use [VOICE_REPLY] in heartbeat responses.`;
 
   return prompt.trim();
 }
@@ -1750,12 +1749,14 @@ function createLivenessReporter(
 
   const sendOrUpdateProgress = async (toolNames: string[]) => {
     if (sendingProgress) {
+      console.log(`[Liveness] Skipped (already sending): ${toolNames.join(", ")}`);
       pendingTools.push(...toolNames);
       return;
     }
 
     const now = Date.now();
     if (now - lastProgressAt < PROGRESS_THROTTLE_MS) {
+      console.log(`[Liveness] Throttled: ${toolNames.join(", ")}`);
       pendingTools.push(...toolNames);
       return;
     }
@@ -1772,21 +1773,30 @@ function createLivenessReporter(
 
     try {
       if (statusMessageId) {
+        console.log(`[Liveness] Editing progress: "${text}"`);
         await bot.api.editMessageText(chatId, statusMessageId, text);
       } else {
+        console.log(`[Liveness] Sending progress: "${text}" to chat=${chatId} thread=${messageThreadId}`);
         const msg = await bot.api.sendMessage(chatId, text, {
           message_thread_id: messageThreadId,
         });
         statusMessageId = msg.message_id;
+        console.log(`[Liveness] Progress message sent: id=${statusMessageId}`);
       }
-    } catch {
-      // Edit/send failed (message deleted, chat unavailable) — ignore
+    } catch (err: any) {
+      console.error(`[Liveness] Failed to send/edit progress: ${err.message}`);
     } finally {
       sendingProgress = false;
     }
   };
 
   const onStreamEvent = (event: any) => {
+    // Log all event types for debugging (temporary)
+    if (event.type) {
+      const contentTypes = event.message?.content?.map((b: any) => b.type)?.join(",") || "none";
+      console.log(`[Liveness] Event: type=${event.type} subtype=${event.subtype || "-"} content=[${contentTypes}]`);
+    }
+
     // Detect tool_use blocks in assistant events
     if (event.type === "assistant" && event.message?.content) {
       const toolNames: string[] = [];
@@ -1796,6 +1806,7 @@ function createLivenessReporter(
         }
       }
       if (toolNames.length > 0) {
+        console.log(`[Liveness] Tool use detected: ${toolNames.join(", ")}`);
         sendOrUpdateProgress(toolNames); // Fire-and-forget (async but not awaited)
       }
     }

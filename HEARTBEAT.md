@@ -5,6 +5,7 @@ If everything is normal, respond with HEARTBEAT_OK.
 
 ## What to Check
 
+- Check the current weather in Aracaju, Sergipe, Brazil using a web search and report it to Rafa (temperature, conditions, humidity, forecast for the day)
 - Check if there are any pending reminders or follow-ups I should know about
 - Check the current time and whether any time-sensitive items need attention
 - Look for any patterns in our recent conversations that suggest something I should be reminded about
@@ -12,6 +13,7 @@ If everything is normal, respond with HEARTBEAT_OK.
 ## When to Report
 
 Report when:
+- Always report the Aracaju weather (this is never skipped)
 - A reminder or deadline is approaching
 - Something changed that the user should know about
 - You notice something that needs the user's attention
