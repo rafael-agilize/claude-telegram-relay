@@ -11,6 +11,7 @@
 ## Current State
 
 **Latest version:** v1.1 (shipped 2026-02-12)
+**Active milestone:** v1.2 — Streaming & Long-Running Task Resilience
 
 **Shipped capabilities:**
 - Telegram group threads as parallel conversation channels
@@ -54,6 +55,8 @@
 | Agent can self-schedule cron | Makes the assistant truly proactive (reminders, follow-ups) | Shipped v1.1 |
 | croner for cron expressions | Same library OpenClaw uses, 5-field cron + timezone support | Shipped v1.1 |
 | Both Telegram commands + file config for cron | Accessibility from phone + power user file editing | Shipped v1.1 |
+| stream-json over json output | Enables activity detection, progress feedback, and eliminates blind 5-min timeout | v1.2 |
+| 15-min inactivity timeout | Complex tasks (subagents, research) need more than 5 min between outputs | v1.2 |
 
 ---
 
@@ -71,7 +74,12 @@
 **Delivered:** Heartbeat system, cron engine, cron management, agent self-scheduling
 **Archive:** [Roadmap](milestones/v1.1-ROADMAP.md) | [Requirements](milestones/v1.1-REQUIREMENTS.md)
 
+### Milestone 1.2: Streaming & Long-Running Task Resilience
+**Goal:** Make the relay robust for complex, long-running Claude CLI tasks.
+**Status:** In Progress (2 phases, started 2026-02-13)
+**Scope:** Stream-json output, activity-based timeout, typing indicators, progress messages
+
 </details>
 
 ---
-*Last updated: 2026-02-12 after Milestone v1.1 completed*
+*Last updated: 2026-02-13 — Milestone v1.2 started*
