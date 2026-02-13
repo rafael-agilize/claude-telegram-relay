@@ -2304,39 +2304,39 @@ bot.on("message:text", async (ctx) => {
 
   const liveness = createLivenessReporter(ctx.chat.id, ctx.message.message_thread_id);
   try {
-  await ctx.replyWithChatAction("typing");
+    await ctx.replyWithChatAction("typing");
 
-  const enrichedPrompt = await buildPrompt(text, ctx.threadInfo);
-  const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
-  const response = await processIntents(rawResponse, ctx.threadInfo?.dbId);
+    const enrichedPrompt = await buildPrompt(text, ctx.threadInfo);
+    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
+    const response = await processIntents(rawResponse, ctx.threadInfo?.dbId);
 
-  // Check if Claude included [VOICE_REPLY] tag
-  const wantsVoice = /\[VOICE_REPLY\]/i.test(response);
-  const cleanResponse = response.replace(/\[VOICE_REPLY\]/gi, "").trim();
+    // Check if Claude included [VOICE_REPLY] tag
+    const wantsVoice = /\[VOICE_REPLY\]/i.test(response);
+    const cleanResponse = response.replace(/\[VOICE_REPLY\]/gi, "").trim();
 
-  if (!cleanResponse) {
-    await sendResponse(ctx, "Sorry, I wasn't able to process that request. Please try again.");
-    return;
-  }
-
-  // V2 thread-aware logging
-  if (ctx.threadInfo) {
-    await insertThreadMessage(ctx.threadInfo.dbId, "user", text);
-    await insertThreadMessage(ctx.threadInfo.dbId, "assistant", cleanResponse);
-    await maybeUpdateThreadSummary(ctx.threadInfo);
-    await logEventV2("message", text.substring(0, 100), {}, ctx.threadInfo.dbId);
-  }
-
-  if (wantsVoice) {
-    const audioBuffer = await textToSpeech(cleanResponse);
-    if (audioBuffer) {
-      const audioPath = join(TEMP_DIR, `tts_${Date.now()}.ogg`);
-      await writeFile(audioPath, audioBuffer);
-      await ctx.replyWithVoice(new InputFile(audioPath));
-      await unlink(audioPath).catch(() => {});
+    if (!cleanResponse) {
+      await sendResponse(ctx, "Sorry, I wasn't able to process that request. Please try again.");
+      return;
     }
-  }
-  await sendResponse(ctx, cleanResponse);
+
+    // V2 thread-aware logging
+    if (ctx.threadInfo) {
+      await insertThreadMessage(ctx.threadInfo.dbId, "user", text);
+      await insertThreadMessage(ctx.threadInfo.dbId, "assistant", cleanResponse);
+      await maybeUpdateThreadSummary(ctx.threadInfo);
+      await logEventV2("message", text.substring(0, 100), {}, ctx.threadInfo.dbId);
+    }
+
+    if (wantsVoice) {
+      const audioBuffer = await textToSpeech(cleanResponse);
+      if (audioBuffer) {
+        const audioPath = join(TEMP_DIR, `tts_${Date.now()}.ogg`);
+        await writeFile(audioPath, audioBuffer);
+        await ctx.replyWithVoice(new InputFile(audioPath));
+        await unlink(audioPath).catch(() => {});
+      }
+    }
+    await sendResponse(ctx, cleanResponse);
   } finally {
     await liveness.cleanup();
   }
