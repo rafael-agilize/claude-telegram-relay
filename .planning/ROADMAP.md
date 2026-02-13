@@ -23,6 +23,9 @@ Plans:
 ### Phase 15: Intent System Upgrade
 **Goal:** Rename tags to upstream convention and add goals lifecycle intents.
 **Requirements:** R2, R3, R4, R5, R6, R11
+**Plans:** 1 plan
+Plans:
+- [x] 15-01-PLAN.md — Rename functions, update processIntents, prompt builders, /memory command
 **Delivers:**
 - Rename `[LEARN:]` → `[REMEMBER:]` in `processIntents()` and all `buildPrompt()` instructions
 - Add `[GOAL: text]` and `[GOAL: text | DEADLINE: date]` intent parsing
@@ -53,4 +56,4 @@ Plans:
 
 ---
 
-*Last updated: 2026-02-13 — Phase 14 complete*
+*Last updated: 2026-02-13 — Phase 15 complete*

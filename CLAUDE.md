@@ -26,7 +26,7 @@ bun run setup:services # Configure external services (Groq, ElevenLabs)
 **Bot commands (in Telegram):**
 - `/soul <text>` — Set the bot's personality (loaded into every prompt)
 - `/new` — Reset the Claude session for the current thread (fresh conversation)
-- `/memory` — Show all learned facts about the user
+- `/memory` — Show learned facts and active goals
 - `/cron list` — Show all scheduled cron jobs with status
 - `/cron add "<schedule>" <prompt>` — Create a new cron job (schedule types: cron "0 7 * * *", interval "every 2h", one-shot "in 20m")
 - `/cron remove <number>` — Remove a cron job by its list number
@@ -61,14 +61,16 @@ tail -f ~/.claude-relay/relay-error.log
 
 **Three-layer memory system** (assembled in `buildPrompt()`):
 1. **Soul** — Bot personality from `bot_soul` table, loaded at the top of every prompt
-2. **Global memory** — Cross-thread facts from `global_memory` table, auto-learned via `[LEARN:]` intent
+2. **Global memory** — Cross-thread facts and goals from `global_memory` table, auto-learned via `[REMEMBER:]` intent
 3. **Thread context** — Per-thread summary + recent 5 messages from Supabase
 
 **Key sections in relay.ts:**
 
-- **Supabase v2 layer** — `getOrCreateThread()`, `updateThreadSession()`, `insertThreadMessage()`, `getRecentThreadMessages()`, `getGlobalMemory()`, `insertGlobalMemory()`, `deleteGlobalMemory()`, `getActiveSoul()`, `setSoul()`, `logEventV2()`
+- **Supabase v2 layer** — `getOrCreateThread()`, `updateThreadSession()`, `insertThreadMessage()`, `getRecentThreadMessages()`, `getMemoryContext()`, `insertMemory()`, `deleteMemory()`, `getActiveGoals()`, `completeGoal()`, `getActiveSoul()`, `setSoul()`, `logEventV2()`
 - **Intent system** — Claude includes tags in responses that get parsed and stripped before delivery:
-  - `[LEARN: fact]` → inserts into `global_memory` table
+  - `[REMEMBER: fact]` → inserts into `global_memory` table with type='fact'
+  - `[GOAL: text]` or `[GOAL: text | DEADLINE: date]` → inserts goal into `global_memory` with type='goal'
+  - `[DONE: search text]` → marks matching goal as completed (type='completed_goal')
   - `[FORGET: search text]` → deletes matching fact from `global_memory`
   - `[VOICE_REPLY]` → triggers ElevenLabs TTS for the response
   - `[CRON: schedule | prompt]` → creates a scheduled cron job with source='agent'
@@ -94,7 +96,7 @@ tail -f ~/.claude-relay/relay-error.log
 - Rate limiting: 10 messages per minute per user
 - Filename sanitization: prevents path traversal in uploaded documents
 - Output size cap: 1MB max before truncation of Claude CLI output
-- Fact length cap: LEARN facts capped at 200 chars, FORGET search capped at 200 chars
+- Memory length cap: REMEMBER/GOAL/DONE entries capped at 200 chars, FORGET search capped at 200 chars
 
 **Message handlers**: Text, voice, photos, documents. Media is downloaded to `~/.claude-relay/uploads/`, file path passed to Claude, cleaned up after processing.
 
