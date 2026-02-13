@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 12 - Streaming Engine
+Phase: 13 - Liveness & Progress
 Plan: Not yet created
-Status: Pending (needs /gsd:plan-phase 12)
-Last activity: 2026-02-13 -- Milestone v1.2 created
+Status: Pending (needs /gsd:plan-phase 13)
+Last activity: 2026-02-13 -- Phase 12 Streaming Engine complete
 
-**Progress:** [░░░░░░░░░░░░░░░░░░░░] 0/2 phases
+**Progress:** [##########░░░░░░░░░░] 1/2 phases
 
 ## Project Reference
 
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 - Phases: 2 total (Phase 12-13)
 - Requirements: 9 total
 - Coverage: 9/9 (100%)
-- Completed: 0/2 phases
+- Completed: 1/2 phases
 - Started: 2026-02-13
 
 | Phase | Name | Duration | Tasks | Files | Status |
 |-------|------|----------|-------|-------|--------|
-| 12 | Streaming Engine | — | — | — | Pending |
+| 12 | Streaming Engine | ~3 min | 3 | 3 | Complete |
 | 13 | Liveness & Progress | — | — | — | Pending |
 
 **Milestone 1.1 (archived):**
@@ -51,21 +51,31 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 - `--include-partial-messages` NOT needed (only complete turn events required)
 - NDJSON format: one JSON object per line, parse line by line
 
-### Key Code Locations
-- `callClaude()`: relay.ts line ~1704 — the function to refactor
+### Key Code Locations (post Phase 12)
+- `callClaude()`: relay.ts line ~1704 — uses stream-json NDJSON parsing
 - `CLAUDE_INACTIVITY_TIMEOUT_MS`: relay.ts line 70 — 15 min (stream-json events reset timer)
 - `killOrphanedProcesses()`: relay.ts line 76 — orphan cleanup after timeout
 - `resetInactivityTimer()`: relay.ts — resets on every stream-json event from stdout
-- Typing action: sent once per handler at lines 2113, 2151, 2202, 2244
+- Typing action: sent once per handler at lines ~2113, ~2151, ~2202, ~2244
+
+## Decisions
+
+- Used ReadableStream.getReader() for stdout parsing (native Bun API, no extra deps)
+- Session ID captured from system/init event with fallback to any event with session_id
+- Stderr no longer used for activity detection -- stdout NDJSON events are more reliable
 
 ## Session Continuity
 
-**Next action:** Run `/gsd:plan-phase 12` to create execution plan for Streaming Engine phase
+**Last session:** 2026-02-13 -- Completed Phase 12 Streaming Engine
+**Stopped at:** Completed 12-streaming-engine-PLAN.md
+
+**Next action:** Run `/gsd:plan-phase 13` to create execution plan for Liveness & Progress phase
 
 **Context for next session:**
-- Milestone v1.2 created with 2 phases, 9 requirements
-- Research complete on stream-json format (see Accumulated Context above)
-- Phase 12 is the core refactor of callClaude(), Phase 13 adds UX on top
+- Phase 12 complete: callClaude() now uses stream-json NDJSON parsing
+- All callers (handlers, heartbeat, cron, summary) work unchanged
+- Phase 13 will add typing indicators and progress messages on top of the streaming infrastructure
+- Stream events are available for Phase 13 to hook into (assistant events for typing, tool_use for progress)
 
 ---
 
