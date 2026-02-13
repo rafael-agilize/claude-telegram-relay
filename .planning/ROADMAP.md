@@ -9,6 +9,10 @@
 ### Phase 14: Schema Migration & Typed Memory
 **Goal:** Evolve `global_memory` table to support typed entries with embeddings.
 **Requirements:** R1, R12, NF3
+**Plans:** 1 plan
+Plans:
+- [ ] 14-01-PLAN.md — Migration SQL + reference schema update (columns, RPCs, extensions, backfill)
+
 **Delivers:**
 - Migration SQL: add `type`, `deadline`, `completed_at`, `priority`, `embedding` columns to `global_memory`
 - Enable `vector` and `pg_net` extensions
@@ -49,4 +53,4 @@
 
 ---
 
-*Last updated: 2026-02-13 — Milestone v1.3 created*
+*Last updated: 2026-02-13 — Phase 14 planned*
