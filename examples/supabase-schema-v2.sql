@@ -6,6 +6,12 @@
 -- in place but the relay no longer writes to them.
 
 -- ============================================================
+-- EXTENSIONS
+-- ============================================================
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
+
+-- ============================================================
 -- THREADS TABLE (Conversation channels)
 -- ============================================================
 -- Each Telegram forum topic or DM gets one row.
@@ -39,18 +45,29 @@ CREATE TABLE IF NOT EXISTS thread_messages (
 CREATE INDEX IF NOT EXISTS idx_thread_messages_thread ON thread_messages(thread_id, created_at DESC);
 
 -- ============================================================
--- GLOBAL MEMORY TABLE (Cross-thread learned facts)
+-- GLOBAL MEMORY TABLE (Cross-thread typed memory: facts, goals, preferences)
 -- ============================================================
--- Bot-managed: Claude decides what to [LEARN:] and [FORGET:]
+-- Bot-managed: Claude decides what to [REMEMBER:] and [FORGET:]
 -- Snippets must be very concise to avoid context bloat.
 CREATE TABLE IF NOT EXISTS global_memory (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  content TEXT NOT NULL,                -- Concise fact (1-2 sentences max)
+  content TEXT NOT NULL,                -- Concise entry (1-2 sentences max)
+  type TEXT NOT NULL DEFAULT 'fact'     -- fact, goal, completed_goal, preference
+    CHECK (type IN ('fact', 'goal', 'completed_goal', 'preference')),
+  deadline TIMESTAMPTZ,                 -- Optional deadline for goals
+  completed_at TIMESTAMPTZ,            -- When a goal was completed
+  priority INTEGER DEFAULT 0,          -- Priority ordering (higher = more important)
+  embedding VECTOR(1536),              -- OpenAI text-embedding-3-small vector
   source_thread_id UUID REFERENCES threads(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_global_memory_created ON global_memory(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_global_memory_type ON global_memory(type);
+CREATE INDEX IF NOT EXISTS idx_global_memory_type_active_goals
+  ON global_memory(created_at DESC) WHERE type = 'goal' AND completed_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_global_memory_embedding
+  ON global_memory USING hnsw (embedding vector_cosine_ops);
 
 -- ============================================================
 -- BOT SOUL TABLE (Personality definition)
@@ -186,6 +203,69 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Get all fact-type memory entries
+CREATE OR REPLACE FUNCTION get_facts()
+RETURNS TABLE (
+  id UUID,
+  created_at TIMESTAMPTZ,
+  content TEXT,
+  source_thread_id UUID
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT gm.id, gm.created_at, gm.content, gm.source_thread_id
+  FROM global_memory gm
+  WHERE gm.type = 'fact'
+  ORDER BY gm.created_at DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Get uncompleted goals, ordered by priority then recency
+CREATE OR REPLACE FUNCTION get_active_goals()
+RETURNS TABLE (
+  id UUID,
+  created_at TIMESTAMPTZ,
+  content TEXT,
+  deadline TIMESTAMPTZ,
+  priority INTEGER,
+  source_thread_id UUID
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT gm.id, gm.created_at, gm.content, gm.deadline, gm.priority, gm.source_thread_id
+  FROM global_memory gm
+  WHERE gm.type = 'goal' AND gm.completed_at IS NULL
+  ORDER BY gm.priority DESC NULLS LAST, gm.created_at DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Vector similarity search using cosine distance
+CREATE OR REPLACE FUNCTION match_memory(
+  query_embedding VECTOR(1536),
+  match_threshold FLOAT DEFAULT 0.7,
+  match_count INT DEFAULT 5
+)
+RETURNS TABLE (
+  id UUID,
+  content TEXT,
+  type TEXT,
+  similarity FLOAT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    gm.id,
+    gm.content,
+    gm.type,
+    1 - (gm.embedding <=> query_embedding) AS similarity
+  FROM global_memory gm
+  WHERE gm.embedding IS NOT NULL
+    AND 1 - (gm.embedding <=> query_embedding) > match_threshold
+  ORDER BY gm.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$ LANGUAGE plpgsql;
+
 -- ============================================================
 -- CRON JOBS TABLE (v1.1: Heartbeat & Proactive Agent)
 -- ============================================================
@@ -199,7 +279,7 @@ CREATE TABLE IF NOT EXISTS cron_jobs (
   prompt TEXT NOT NULL,
   target_thread_id UUID REFERENCES threads(id) ON DELETE SET NULL,
   enabled BOOLEAN DEFAULT true,
-  source TEXT DEFAULT 'user' CHECK (source IN ('user', 'agent')),
+  source TEXT DEFAULT 'user' CHECK (source IN ('user', 'agent', 'file')),
   last_run_at TIMESTAMPTZ,
   next_run_at TIMESTAMPTZ
 );

@@ -11,7 +11,7 @@
 **Requirements:** R1, R12, NF3
 **Plans:** 1 plan
 Plans:
-- [ ] 14-01-PLAN.md — Migration SQL + reference schema update (columns, RPCs, extensions, backfill)
+- [x] 14-01-PLAN.md — Migration SQL + reference schema update (columns, RPCs, extensions, backfill)
 
 **Delivers:**
 - Migration SQL: add `type`, `deadline`, `completed_at`, `priority`, `embedding` columns to `global_memory`
@@ -53,4 +53,4 @@ Plans:
 
 ---
 
-*Last updated: 2026-02-13 — Phase 14 planned*
+*Last updated: 2026-02-13 — Phase 14 complete*
