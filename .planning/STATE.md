@@ -53,9 +53,9 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 
 ### Key Code Locations
 - `callClaude()`: relay.ts line ~1704 — the function to refactor
-- `CLAUDE_INACTIVITY_TIMEOUT_MS`: relay.ts line 70 — currently 5 min
+- `CLAUDE_INACTIVITY_TIMEOUT_MS`: relay.ts line 70 — 15 min (stream-json events reset timer)
 - `killOrphanedProcesses()`: relay.ts line 76 — orphan cleanup after timeout
-- `resetInactivityTimer()`: relay.ts line 1739 — currently resets on stderr only
+- `resetInactivityTimer()`: relay.ts — resets on every stream-json event from stdout
 - Typing action: sent once per handler at lines 2113, 2151, 2202, 2244
 
 ## Session Continuity
