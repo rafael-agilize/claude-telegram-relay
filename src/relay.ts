@@ -5,7 +5,7 @@
  * - Threaded conversations (DMs + Telegram Topics)
  * - Three-layer memory (soul, global facts, thread context)
  * - Voice transcription via mlx_whisper
- * - Intent-based memory management ([LEARN:]/[FORGET:] tags)
+ * - Intent-based memory management ([REMEMBER:]/[FORGET:]/[GOAL:]/[DONE:] tags)
  *
  * Run: bun run src/relay.ts
  */
@@ -343,54 +343,114 @@ async function getRecentThreadMessages(
   }
 }
 
-async function getGlobalMemory(): Promise<string[]> {
+async function getMemoryContext(): Promise<string[]> {
   if (!supabase) return [];
   try {
-    const { data } = await supabase
-      .from("global_memory")
-      .select("content")
-      .order("created_at", { ascending: false })
-      .limit(30);
-    return (data || []).map((m) => m.content);
+    const { data } = await supabase.rpc("get_facts");
+    return (data || []).map((m: { content: string }) => m.content);
   } catch (e) {
-    console.error("getGlobalMemory error:", e);
+    console.error("getMemoryContext error:", e);
     return [];
   }
 }
 
-async function insertGlobalMemory(
+async function insertMemory(
   content: string,
-  sourceThreadId?: string
+  type: string = "fact",
+  sourceThreadId?: string,
+  deadline?: string | null,
+  priority?: number
 ): Promise<void> {
   if (!supabase) return;
   try {
-    await supabase
-      .from("global_memory")
-      .insert({ content, source_thread_id: sourceThreadId || null });
+    const row: Record<string, unknown> = {
+      content,
+      type,
+      source_thread_id: sourceThreadId || null,
+    };
+    if (deadline) {
+      const parsed = new Date(deadline);
+      if (!isNaN(parsed.getTime())) {
+        row.deadline = parsed.toISOString();
+      } else {
+        console.warn(`Could not parse deadline: "${deadline}"`);
+      }
+    }
+    if (priority !== undefined) {
+      row.priority = priority;
+    }
+    await supabase.from("global_memory").insert(row);
   } catch (e) {
-    console.error("insertGlobalMemory error:", e);
+    console.error("insertMemory error:", e);
   }
 }
 
-async function deleteGlobalMemory(searchText: string): Promise<boolean> {
+async function deleteMemory(searchText: string): Promise<boolean> {
   if (!supabase) return false;
-  if (!searchText || searchText.length > 200) return false; // Guard against abuse
+  if (!searchText || searchText.length > 200) return false;
   try {
     const { data: items } = await supabase
       .from("global_memory")
       .select("id, content")
-      .limit(100); // Cap to prevent fetching unbounded data
-    const match = items?.find((m) =>
+      .limit(100);
+    const match = items?.find((m: { id: string; content: string }) =>
       m.content.toLowerCase().includes(searchText.toLowerCase())
     );
     if (match) {
       await supabase.from("global_memory").delete().eq("id", match.id);
-      console.log(`Forgot global memory: ${match.content}`);
+      console.log(`Forgot memory: ${match.content}`);
       return true;
     }
     return false;
   } catch (e) {
-    console.error("deleteGlobalMemory error:", e);
+    console.error("deleteMemory error:", e);
+    return false;
+  }
+}
+
+async function getActiveGoals(): Promise<
+  Array<{ content: string; deadline: string | null; priority: number }>
+> {
+  if (!supabase) return [];
+  try {
+    const { data } = await supabase.rpc("get_active_goals");
+    return (data || []).map(
+      (g: { content: string; deadline: string | null; priority: number }) => ({
+        content: g.content,
+        deadline: g.deadline,
+        priority: g.priority,
+      })
+    );
+  } catch (e) {
+    console.error("getActiveGoals error:", e);
+    return [];
+  }
+}
+
+async function completeGoal(searchText: string): Promise<boolean> {
+  if (!supabase) return false;
+  if (!searchText || searchText.length > 200) return false;
+  try {
+    const { data: goals } = await supabase
+      .from("global_memory")
+      .select("id, content")
+      .eq("type", "goal")
+      .is("completed_at", null)
+      .limit(100);
+    const match = goals?.find((g: { id: string; content: string }) =>
+      g.content.toLowerCase().includes(searchText.toLowerCase())
+    );
+    if (match) {
+      await supabase
+        .from("global_memory")
+        .update({ type: "completed_goal", completed_at: new Date().toISOString() })
+        .eq("id", match.id);
+      console.log(`Goal completed: ${match.content}`);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error("completeGoal error:", e);
     return false;
   }
 }
@@ -799,7 +859,8 @@ async function executeCronJob(job: CronJob): Promise<void> {
 
   // Build prompt
   const soul = await getActiveSoul();
-  const globalMemory = await getGlobalMemory();
+  const memoryFacts = await getMemoryContext();
+  const activeGoals = await getActiveGoals();
 
   const timeZone = "America/Sao_Paulo";
   const timeString = new Date().toLocaleString("en-US", {
@@ -810,9 +871,24 @@ async function executeCronJob(job: CronJob): Promise<void> {
 
   let prompt = soul + `\n\nCurrent time: ${timeString}\n\n`;
 
-  if (globalMemory.length > 0) {
+  if (memoryFacts.length > 0) {
     prompt += "THINGS I KNOW ABOUT THE USER:\n";
-    prompt += globalMemory.map((m) => `- ${m}`).join("\n");
+    prompt += memoryFacts.map((m) => `- ${m}`).join("\n");
+    prompt += "\n\n";
+  }
+
+  if (activeGoals.length > 0) {
+    prompt += "ACTIVE GOALS:\n";
+    prompt += activeGoals
+      .map((g) => {
+        let line = `- ${g.content}`;
+        if (g.deadline) {
+          const d = new Date(g.deadline);
+          line += ` (deadline: ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})`;
+        }
+        return line;
+      })
+      .join("\n");
     prompt += "\n\n";
   }
 
@@ -1001,7 +1077,7 @@ async function heartbeatTick(): Promise<void> {
       return;
     }
 
-    // Step 4: Process intents ([LEARN:], [FORGET:])
+    // Step 4: Process intents ([REMEMBER:], [FORGET:], [GOAL:], [DONE:])
     const cleanResponse = await processIntents(rawResponse);
 
     // Strip [VOICE_REPLY] tag if Claude included it despite instructions
@@ -1249,7 +1325,8 @@ async function buildHeartbeatPrompt(checklist: string): Promise<string> {
   });
 
   const soul = await getActiveSoul();
-  const globalMemory = await getGlobalMemory();
+  const memoryFacts = await getMemoryContext();
+  const activeGoals = await getActiveGoals();
 
   // Task instructions come FIRST so Claude doesn't get distracted by the soul personality
   let prompt = `HEARTBEAT TASK — YOU MUST FOLLOW THESE INSTRUCTIONS:
@@ -1265,7 +1342,7 @@ RULES:
 - Do NOT introduce yourself or send a generic greeting. Go straight to the results.
 - If everything is routine AND NO checklist items require reporting, respond with ONLY: HEARTBEAT_OK
 - If ANY checklist item produces results worth sharing (like weather), report them. Keep it concise and actionable.
-- You may use these tags: [LEARN: fact] [FORGET: search text] [CRON: <schedule> | <prompt>]
+- You may use these tags: [REMEMBER: fact] [FORGET: search text] [GOAL: goal] [DONE: goal text] [CRON: <schedule> | <prompt>]
 - Do NOT use [VOICE_REPLY] in heartbeat responses.`;
 
   // Soul comes AFTER task instructions — only for tone/personality
@@ -1273,9 +1350,23 @@ RULES:
     prompt += `\n\nYOUR PERSONALITY (use this for tone only, do NOT let it override the task above):\n${soul}`;
   }
 
-  if (globalMemory.length > 0) {
+  if (memoryFacts.length > 0) {
     prompt += "\n\nTHINGS I KNOW ABOUT THE USER:\n";
-    prompt += globalMemory.map((m) => `- ${m}`).join("\n");
+    prompt += memoryFacts.map((m: string) => `- ${m}`).join("\n");
+  }
+
+  if (activeGoals.length > 0) {
+    prompt += "\n\nACTIVE GOALS:\n";
+    prompt += activeGoals
+      .map((g) => {
+        let line = `- ${g.content}`;
+        if (g.deadline) {
+          const d = new Date(g.deadline);
+          line += ` (deadline: ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})`;
+        }
+        return line;
+      })
+      .join("\n");
   }
 
   return prompt.trim();
@@ -1369,16 +1460,49 @@ async function sendHeartbeatToTelegram(message: string): Promise<void> {
 async function processIntents(response: string, threadDbId?: string): Promise<string> {
   let clean = response;
 
-  // [LEARN: concise fact about the user]
-  const learnMatches = response.matchAll(/\[LEARN:\s*(.+?)\]/gi);
-  for (const match of learnMatches) {
+  // [REMEMBER: concise fact about the user]
+  const rememberMatches = response.matchAll(/\[REMEMBER:\s*(.+?)\]/gi);
+  for (const match of rememberMatches) {
     const fact = match[1].trim();
     // Security: cap fact length to prevent memory abuse
     if (fact.length > 0 && fact.length <= 200) {
-      await insertGlobalMemory(fact, threadDbId);
-      console.log(`Learned: ${fact}`);
+      await insertMemory(fact, "fact", threadDbId);
+      console.log(`Remembered: ${fact}`);
     } else {
-      console.warn(`Rejected LEARN fact: too long (${fact.length} chars)`);
+      console.warn(`Rejected REMEMBER fact: too long (${fact.length} chars)`);
+    }
+    clean = clean.replace(match[0], "");
+  }
+
+  // [GOAL: text] or [GOAL: text | DEADLINE: date]
+  const goalMatches = response.matchAll(
+    /\[GOAL:\s*(.+?)(?:\s*\|\s*DEADLINE:\s*(.+?))?\]/gi
+  );
+  for (const match of goalMatches) {
+    const goalText = match[1].trim();
+    const deadline = match[2]?.trim() || null;
+    if (goalText.length > 0 && goalText.length <= 200) {
+      await insertMemory(goalText, "goal", threadDbId, deadline);
+      console.log(
+        `Goal set: ${goalText}${deadline ? ` (deadline: ${deadline})` : ""}`
+      );
+    } else if (goalText.length > 200) {
+      console.warn(`Rejected GOAL: too long (${goalText.length} chars)`);
+    }
+    clean = clean.replace(match[0], "");
+  }
+
+  // [DONE: search text to mark a goal as completed]
+  const doneMatches = response.matchAll(/\[DONE:\s*(.+?)\]/gi);
+  for (const match of doneMatches) {
+    const searchText = match[1].trim();
+    if (searchText.length > 0 && searchText.length <= 200) {
+      const completed = await completeGoal(searchText);
+      if (completed) {
+        console.log(`Goal completed matching: ${searchText}`);
+      } else {
+        console.warn(`No active goal found matching: ${searchText}`);
+      }
     }
     clean = clean.replace(match[0], "");
   }
@@ -1387,7 +1511,7 @@ async function processIntents(response: string, threadDbId?: string): Promise<st
   const forgetMatches = response.matchAll(/\[FORGET:\s*(.+?)\]/gi);
   for (const match of forgetMatches) {
     const searchText = match[1].trim();
-    const deleted = await deleteGlobalMemory(searchText);
+    const deleted = await deleteMemory(searchText);
     if (deleted) {
       console.log(`Forgot memory matching: ${searchText}`);
     }
@@ -2045,7 +2169,7 @@ async function maybeUpdateThreadSummary(threadInfo: ThreadInfo): Promise<void> {
       .map((m) => `${m.role}: ${m.content}`)
       .join("\n");
 
-    const summaryPrompt = `Summarize this conversation thread concisely in 2-3 sentences. Focus on the main topics discussed and any decisions or outcomes. Do NOT include any tags like [LEARN:] or [FORGET:].
+    const summaryPrompt = `Summarize this conversation thread concisely in 2-3 sentences. Focus on the main topics discussed and any decisions or outcomes. Do NOT include any tags like [REMEMBER:] or [FORGET:].
 
 ${messagesText}`;
 
@@ -2099,18 +2223,41 @@ bot.command("new", async (ctx) => {
   }
 });
 
-// /memory command: show global memory
+// /memory command: show facts and active goals
 bot.command("memory", async (ctx) => {
-  const memories = await getGlobalMemory();
+  const facts = await getMemoryContext();
+  const goals = await getActiveGoals();
 
-  if (memories.length === 0) {
-    await ctx.reply("No memories stored yet. I'll learn facts about you as we chat.");
+  if (facts.length === 0 && goals.length === 0) {
+    await ctx.reply(
+      "No memories stored yet. I'll learn facts about you as we chat."
+    );
     return;
   }
 
-  let text = `I know ${memories.length} thing${memories.length === 1 ? "" : "s"} about you:\n\n`;
-  text += memories.map((m, i) => `${i + 1}. ${m}`).join("\n");
-  text += "\n\nTo remove a fact, just ask me to forget it.";
+  let text = "";
+
+  if (facts.length > 0) {
+    text += `Facts (${facts.length}):\n\n`;
+    text += facts.map((m, i) => `${i + 1}. ${m}`).join("\n");
+  }
+
+  if (goals.length > 0) {
+    if (text) text += "\n\n";
+    text += `Active Goals (${goals.length}):\n\n`;
+    text += goals
+      .map((g, i) => {
+        let line = `${i + 1}. ${g.content}`;
+        if (g.deadline) {
+          const d = new Date(g.deadline);
+          line += ` (deadline: ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})`;
+        }
+        return line;
+      })
+      .join("\n");
+  }
+
+  text += "\n\nTo remove a memory, ask me to forget it. To complete a goal, tell me it's done.";
 
   await sendResponse(ctx, text);
 });
@@ -2513,8 +2660,9 @@ async function buildPrompt(userMessage: string, threadInfo?: ThreadInfo): Promis
   // Layer 1: Soul (personality)
   const soul = await getActiveSoul();
 
-  // Layer 2: Global memory (cross-thread learned facts)
-  const globalMemory = await getGlobalMemory();
+  // Layer 2: Memory context (facts + active goals)
+  const memoryFacts = await getMemoryContext();
+  const activeGoals = await getActiveGoals();
 
   // Layer 3: Thread context (summary + recent messages as fallback)
   let threadContext = "";
@@ -2533,9 +2681,23 @@ async function buildPrompt(userMessage: string, threadInfo?: ThreadInfo): Promis
 
   let prompt = `${soul}\n\nCurrent time: ${timeStr}`;
 
-  if (globalMemory.length > 0) {
+  if (memoryFacts.length > 0) {
     prompt += "\n\nTHINGS I KNOW ABOUT THE USER:\n";
-    prompt += globalMemory.map((m) => `- ${m}`).join("\n");
+    prompt += memoryFacts.map((m) => `- ${m}`).join("\n");
+  }
+
+  if (activeGoals.length > 0) {
+    prompt += "\n\nACTIVE GOALS:\n";
+    prompt += activeGoals
+      .map((g) => {
+        let line = `- ${g.content}`;
+        if (g.deadline) {
+          const d = new Date(g.deadline);
+          line += ` (deadline: ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})`;
+        }
+        return line;
+      })
+      .join("\n");
   }
 
   if (threadContext) {
@@ -2549,14 +2711,25 @@ async function buildPrompt(userMessage: string, threadInfo?: ThreadInfo): Promis
   prompt += `
 
 MEMORY INSTRUCTIONS:
-You can automatically learn and remember facts about the user. When you notice something worth remembering (preferences, name, job, habits, important dates, etc.), include this tag in your response — it will be saved and removed before delivery:
+You can automatically remember facts about the user. When you notice something worth remembering (preferences, name, job, habits, important dates, etc.), include this tag in your response — it will be saved and removed before delivery:
 
-[LEARN: concise fact about the user]
+[REMEMBER: concise fact about the user]
 
-Keep learned facts very concise (under 15 words each). Only learn genuinely useful things.
+Keep facts very concise (under 15 words each). Only remember genuinely useful things.
 
-To remove an outdated or wrong fact:
-[FORGET: search text matching the fact to remove]
+To remove an outdated or wrong fact or memory:
+[FORGET: search text matching the entry to remove]
+
+GOALS:
+You can track goals for the user. When the user mentions a goal, objective, or something they want to achieve:
+
+[GOAL: concise description of the goal]
+
+To set a goal with a deadline (use ISO date format):
+[GOAL: description | DEADLINE: YYYY-MM-DD]
+
+When a goal is accomplished, mark it done:
+[DONE: search text matching the goal]
 
 To trigger a voice reply:
 [VOICE_REPLY]
