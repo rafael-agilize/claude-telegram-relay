@@ -455,6 +455,25 @@ async function completeGoal(searchText: string): Promise<boolean> {
   }
 }
 
+async function getRelevantMemory(
+  query: string
+): Promise<Array<{ content: string; type: string; similarity: number }>> {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase.functions.invoke("search", {
+      body: { query, match_count: 5, match_threshold: 0.7 },
+    });
+    if (error) {
+      console.warn("Semantic search unavailable:", error.message);
+      return [];
+    }
+    return data?.results || [];
+  } catch (e) {
+    // Graceful fallback — Edge Functions not deployed or unreachable
+    return [];
+  }
+}
+
 async function getActiveSoul(): Promise<string> {
   if (!supabase) return "You are a helpful, concise assistant responding via Telegram.";
   try {
@@ -2664,6 +2683,9 @@ async function buildPrompt(userMessage: string, threadInfo?: ThreadInfo): Promis
   const memoryFacts = await getMemoryContext();
   const activeGoals = await getActiveGoals();
 
+  // Semantic search — find memories relevant to the current message
+  const relevantMemories = await getRelevantMemory(userMessage);
+
   // Layer 3: Thread context (summary + recent messages as fallback)
   let threadContext = "";
   if (threadInfo?.dbId) {
@@ -2698,6 +2720,23 @@ async function buildPrompt(userMessage: string, threadInfo?: ThreadInfo): Promis
         return line;
       })
       .join("\n");
+  }
+
+  if (relevantMemories.length > 0) {
+    // Deduplicate: filter out memories already shown in facts or goals sections
+    const shownContent = new Set([
+      ...memoryFacts.map((f) => f.toLowerCase()),
+      ...activeGoals.map((g) => g.content.toLowerCase()),
+    ]);
+    const uniqueRelevant = relevantMemories.filter(
+      (m) => !shownContent.has(m.content.toLowerCase())
+    );
+    if (uniqueRelevant.length > 0) {
+      prompt += "\n\nRELEVANT MEMORIES (semantically related to your message):\n";
+      prompt += uniqueRelevant
+        .map((m) => `- ${m.content} [${m.type}, relevance: ${(m.similarity * 100).toFixed(0)}%]`)
+        .join("\n");
+    }
   }
 
   if (threadContext) {

@@ -2,58 +2,32 @@
 
 ## Current Position
 
-Phase: 15 — Intent System Upgrade (COMPLETE)
-Status: Ready for Phase 16
-Last activity: 2026-02-13 — Phase 15 executed (1 plan, 4 tasks)
+Phase: — (no active milestone)
+Status: v1.3 archived, ready for next milestone
+Last activity: 2026-02-13 — Milestone v1.3 archived
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-02-13)
 
-**Core value:** Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, and real-time feedback
-**Current focus:** v1.3 Smart Memory — typed memory, goals lifecycle, semantic search
+**Core value:** Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, semantic search, and real-time feedback
+**Current focus:** None — ready for `/gsd:new-milestone`
 
-## Milestone v1.3 Progress
+## Shipped Milestones
 
-| Phase | Name | Status | Requirements |
-|-------|------|--------|-------------|
-| 14 | Schema Migration & Typed Memory | **Complete** | R1, R12, NF3 |
-| 15 | Intent System Upgrade | **Complete** | R2, R3, R4, R5, R6, R11 |
-| 16 | Semantic Search via Edge Functions | Pending | R7, R8, R9, R10, NF1, NF2 |
+| Version | Name | Phases | Completed |
+|---------|------|--------|-----------|
+| v1.0 | Conversational Threading & Memory | 1-5 | 2026-02-10 |
+| v1.1 | Heartbeat & Proactive Agent | 6-11 | 2026-02-12 |
+| v1.2 | Streaming & Long-Running Tasks | 12-13 | 2026-02-13 |
+| v1.3 | Smart Memory | 14-16 | 2026-02-13 |
 
-## Decisions
-
-- Used Supabase RPC functions (get_facts, get_active_goals) instead of direct table queries for type filtering
-- GOAL deadline parsing uses Date constructor with validation — invalid dates are warned but not rejected
-- Processing order: REMEMBER > GOAL > DONE > FORGET > CRON (goals created before they can be completed in same response)
-
-## Performance Metrics
-
-**Phase 15 execution:**
-- Duration: ~3 minutes
-- Tasks: 4/4
-- Files modified: 1 (src/relay.ts — 226 insertions, 53 deletions)
-
-**Milestone v1.2 (archived):**
-- Phases: 2 total (Phase 12-13)
-- Requirements: 9/9 (100%)
-- Status: Complete (2026-02-13)
-- Delivered: Streaming engine, activity-based timeout, typing indicators, progress messages
-
-**Milestone v1.1 (archived):**
-- Phases: 6 total (Phase 6-11)
-- Status: Complete (2026-02-12)
-- Delivered: Heartbeat, cron engine, cron management, agent scheduling
-
-**Milestone v1.0 (archived):**
-- Phases: 5 total (Phase 1-5)
-- Status: Complete (2026-02-10)
-- Delivered: Conversational threading, three-layer memory, voice I/O
+**Total: 4 milestones, 16 phases**
 
 ## Session Continuity
 
-**Last session:** 2026-02-13 — Phase 15 executed and verified
-**Next action:** Run `/gsd:plan-phase 16` to plan semantic search via edge functions
+**Last session:** 2026-02-13 — v1.3 archived (typed memory, goals, semantic search)
+**Next action:** Run `/gsd:new-milestone` to define next version
 
 ---
 

@@ -62,11 +62,16 @@ tail -f ~/.claude-relay/relay-error.log
 **Three-layer memory system** (assembled in `buildPrompt()`):
 1. **Soul** — Bot personality from `bot_soul` table, loaded at the top of every prompt
 2. **Global memory** — Cross-thread facts and goals from `global_memory` table, auto-learned via `[REMEMBER:]` intent
-3. **Thread context** — Per-thread summary + recent 5 messages from Supabase
+3. **Semantic memory** — Relevant memories fetched via `getRelevantMemory()` → Supabase Edge Function → OpenAI embeddings → `match_memory()` RPC. Deduplicated against facts/goals. Graceful fallback (empty) when Edge Functions unavailable.
+4. **Thread context** — Per-thread summary + recent 5 messages from Supabase
+
+**Supabase Edge Functions** (`supabase/functions/`):
+- `embed/index.ts` — Auto-embeds `global_memory` rows on INSERT via database webhook. Uses OpenAI text-embedding-3-small. OPENAI_API_KEY in Supabase secrets only.
+- `search/index.ts` — Semantic search: embeds query, calls `match_memory()` RPC, returns ranked results. Always returns `{ results: [] }` on errors.
 
 **Key sections in relay.ts:**
 
-- **Supabase v2 layer** — `getOrCreateThread()`, `updateThreadSession()`, `insertThreadMessage()`, `getRecentThreadMessages()`, `getMemoryContext()`, `insertMemory()`, `deleteMemory()`, `getActiveGoals()`, `completeGoal()`, `getActiveSoul()`, `setSoul()`, `logEventV2()`
+- **Supabase v2 layer** — `getOrCreateThread()`, `updateThreadSession()`, `insertThreadMessage()`, `getRecentThreadMessages()`, `getMemoryContext()`, `insertMemory()`, `deleteMemory()`, `getActiveGoals()`, `completeGoal()`, `getRelevantMemory()`, `getActiveSoul()`, `setSoul()`, `logEventV2()`
 - **Intent system** — Claude includes tags in responses that get parsed and stripped before delivery:
   - `[REMEMBER: fact]` → inserts into `global_memory` table with type='fact'
   - `[GOAL: text]` or `[GOAL: text | DEADLINE: date]` → inserts goal into `global_memory` with type='goal'

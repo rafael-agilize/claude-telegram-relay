@@ -50,6 +50,11 @@ CREATE INDEX IF NOT EXISTS idx_global_memory_embedding
 -- ============================================================
 -- RPC: get_facts()
 -- ============================================================
+-- Drop existing functions if return type differs (CREATE OR REPLACE can't change return type)
+DROP FUNCTION IF EXISTS get_facts();
+DROP FUNCTION IF EXISTS get_active_goals();
+DROP FUNCTION IF EXISTS match_memory(VECTOR(1536), FLOAT, INT);
+
 -- Returns all fact-type memory entries, newest first.
 CREATE OR REPLACE FUNCTION get_facts()
 RETURNS TABLE (

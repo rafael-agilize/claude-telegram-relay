@@ -311,3 +311,20 @@ CREATE POLICY "service_role_all" ON cron_jobs FOR ALL
   TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "service_role_all" ON heartbeat_config FOR ALL
   TO service_role USING (true) WITH CHECK (true);
+
+-- ============================================================
+-- SEMANTIC SEARCH SETUP (v1.3 Phase 16)
+-- ============================================================
+-- The embedding column and match_memory() RPC are defined above.
+-- To enable auto-embedding, configure a Database Webhook:
+--   1. Deploy the embed Edge Function: supabase functions deploy embed
+--   2. In Supabase Dashboard: Database > Webhooks > Create
+--      - Name: embed_memory
+--      - Table: global_memory
+--      - Events: INSERT
+--      - Type: Supabase Edge Function
+--      - Function: embed
+--   3. Set the OPENAI_API_KEY secret: supabase secrets set OPENAI_API_KEY=sk-...
+--   4. Deploy the search Edge Function: supabase functions deploy search
+--
+-- See docs/SETUP-SEMANTIC-SEARCH.md for full instructions.

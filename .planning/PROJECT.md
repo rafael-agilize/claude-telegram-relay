@@ -4,19 +4,22 @@
 
 **Description:** A relay that bridges Telegram to the Claude Code CLI with persistent memory, voice I/O, proactive agent capabilities, and unrestricted permissions.
 
-**Tech Stack:** Bun runtime, TypeScript, Grammy (Telegram Bot), Supabase (PostgreSQL), Claude CLI, Groq Whisper, ElevenLabs TTS, croner (cron scheduling)
+**Tech Stack:** Bun runtime, TypeScript, Grammy (Telegram Bot), Supabase (PostgreSQL + Edge Functions), Claude CLI, Groq Whisper, ElevenLabs TTS, croner (cron scheduling), OpenAI Embeddings (via Edge Functions)
 
-**Architecture:** Single-file relay (`src/relay.ts` ~2,700 lines). Message flow: Telegram -> Grammy handler -> buildPrompt() -> callClaude() via Bun.spawn -> processIntents() -> response back to Telegram.
+**Architecture:** Single-file relay (`src/relay.ts` ~2,800 lines) + 2 Supabase Edge Functions. Message flow: Telegram -> Grammy handler -> buildPrompt() -> callClaude() via Bun.spawn -> processIntents() -> response back to Telegram.
 
 ## Current State
 
-**Latest version:** v1.2 (shipped 2026-02-13)
-**Active milestone:** v1.3 — Smart Memory (Phases 14-16)
+**Latest version:** v1.3 (shipped 2026-02-13)
+**Active milestone:** None — ready for next milestone
 
 **Shipped capabilities:**
 - Telegram group threads as parallel conversation channels
 - True Claude CLI conversation continuity via --resume per thread
-- Three-layer memory: recent messages, thread summary, global memory
+- Four-layer memory: recent messages, thread summary, global memory (facts/goals), semantic search
+- Typed memory system: facts, goals, completed goals, preferences
+- Goals lifecycle: [GOAL:] creation with optional deadlines, [DONE:] completion
+- Semantic search via Supabase Edge Functions + OpenAI text-embedding-3-small embeddings
 - Bot "soul" (personality) loaded in every interaction
 - Supabase v2 schema (threads, global_memory, bot_soul, logs_v2, cron_jobs, heartbeat_config)
 - Voice transcription (Groq Whisper) and TTS (ElevenLabs)
@@ -26,6 +29,7 @@
 - Cron system: 3 schedule types (cron/interval/once), Telegram commands, file sync, agent self-scheduling
 - Stream-json NDJSON parsing with activity-based 15-min inactivity timeout
 - Real-time typing indicators (4s interval) and tool-use progress messages (15s throttle)
+- Graceful degradation: semantic search returns empty when Edge Functions unavailable
 
 ## Out of Scope
 
@@ -40,6 +44,7 @@
 - OpenClaw uses a gateway architecture with 13+ channels; we stay lightweight single-file
 - Key adaptations: HEARTBEAT.md checklist, HEARTBEAT_OK suppression, active hours, croner library
 - Our relay spawns Claude CLI processes; OpenClaw uses embedded Pi agent RPC
+- Upstream memory system adapted from [fced316](https://github.com/rafael-agilize/claude-telegram-relay/commit/fced3162c65657635e97164f7ba4f519e145283a)
 
 ## Constraints
 
@@ -47,6 +52,7 @@
 - **Architecture**: Single-file relay -- all features integrate into relay.ts
 - **State**: Supabase -- all persistent state stored in cloud DB
 - **Cost**: Claude API calls per heartbeat/cron -- default 1h heartbeat interval to manage cost
+- **Embeddings**: OpenAI API key in Supabase secrets only -- relay never touches it
 
 ## Key Decisions
 
@@ -60,9 +66,10 @@
 | stream-json over json output | Enables activity detection, progress feedback, and eliminates blind 5-min timeout | Shipped v1.2 |
 | 15-min inactivity timeout | Complex tasks (subagents, research) need more than 5 min between outputs | Shipped v1.2 |
 | Liveness reporter pattern | Factory + callback decouples typing/progress from callClaude internals | Shipped v1.2 |
-| Adopt upstream intent names | [REMEMBER:]/[GOAL:]/[DONE:] from upstream; keeps parity with fork source | v1.3 |
-| OpenAI embeddings via Edge Functions | Keeps OpenAI key in Supabase secrets, relay never needs it | v1.3 |
-| Memory-only semantic search | Thread messages already have recency context; memory search adds most value | v1.3 |
+| Adopt upstream intent names | [REMEMBER:]/[GOAL:]/[DONE:] from upstream; keeps parity with fork source | Shipped v1.3 |
+| OpenAI embeddings via Edge Functions | Keeps OpenAI key in Supabase secrets, relay never needs it | Shipped v1.3 |
+| Memory-only semantic search | Thread messages already have recency context; memory search adds most value | Shipped v1.3 |
+| Supabase RPCs over direct queries | Cleaner type filtering at DB level (get_facts, get_active_goals) | Shipped v1.3 |
 
 ---
 
@@ -88,10 +95,11 @@
 
 ### Milestone 1.3: Smart Memory
 **Goal:** Evolve flat memory into typed system with goals tracking and semantic search.
-**Status:** In progress (3 phases: 14-16)
-**Origin:** Upstream commit [fced316](https://github.com/rafael-agilize/claude-telegram-relay/commit/fced3162c65657635e97164f7ba4f519e145283a)
+**Status:** Complete (3 phases, shipped 2026-02-13)
+**Delivered:** Typed memory, goals lifecycle, semantic search via Edge Functions
+**Archive:** [Roadmap](milestones/v1.3-ROADMAP.md) | [Requirements](milestones/v1.3-REQUIREMENTS.md)
 
 </details>
 
 ---
-*Last updated: 2026-02-13 — Milestone v1.3 started*
+*Last updated: 2026-02-13 — v1.3 shipped*

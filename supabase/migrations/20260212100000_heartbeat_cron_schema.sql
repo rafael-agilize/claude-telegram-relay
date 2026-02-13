@@ -49,7 +49,14 @@ VALUES (60, '08:00', '22:00', 'America/Sao_Paulo', true);
 ALTER TABLE cron_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE heartbeat_config ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "service_role_all" ON cron_jobs FOR ALL
-  TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY "service_role_all" ON heartbeat_config FOR ALL
-  TO service_role USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "service_role_all" ON cron_jobs FOR ALL
+    TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "service_role_all" ON heartbeat_config FOR ALL
+    TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
