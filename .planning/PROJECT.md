@@ -11,7 +11,7 @@
 ## Current State
 
 **Latest version:** v1.2 (shipped 2026-02-13)
-**Active milestone:** None
+**Active milestone:** v1.3 — Smart Memory (Phases 14-16)
 
 **Shipped capabilities:**
 - Telegram group threads as parallel conversation channels
@@ -21,7 +21,7 @@
 - Supabase v2 schema (threads, global_memory, bot_soul, logs_v2, cron_jobs, heartbeat_config)
 - Voice transcription (Groq Whisper) and TTS (ElevenLabs)
 - DM + supergroup Topics support
-- Intent system: [LEARN:], [FORGET:], [VOICE_REPLY], [CRON:]
+- Intent system: [REMEMBER:], [FORGET:], [GOAL:], [DONE:], [VOICE_REPLY], [CRON:]
 - Heartbeat system: periodic agent loop with HEARTBEAT.md checklist, smart suppression, active hours, dedicated thread
 - Cron system: 3 schedule types (cron/interval/once), Telegram commands, file sync, agent self-scheduling
 - Stream-json NDJSON parsing with activity-based 15-min inactivity timeout
@@ -31,7 +31,7 @@
 
 - Multi-user support (still single authorized user) -- complexity, not needed
 - Web dashboard -- overkill for single-user
-- Semantic/vector search on messages -- premature optimization
+- Semantic/vector search on thread_messages -- memory-only semantic search sufficient for now
 - Multi-channel support (WhatsApp, Slack, etc.) -- Telegram-only by design
 
 ## Context
@@ -60,6 +60,9 @@
 | stream-json over json output | Enables activity detection, progress feedback, and eliminates blind 5-min timeout | Shipped v1.2 |
 | 15-min inactivity timeout | Complex tasks (subagents, research) need more than 5 min between outputs | Shipped v1.2 |
 | Liveness reporter pattern | Factory + callback decouples typing/progress from callClaude internals | Shipped v1.2 |
+| Adopt upstream intent names | [REMEMBER:]/[GOAL:]/[DONE:] from upstream; keeps parity with fork source | v1.3 |
+| OpenAI embeddings via Edge Functions | Keeps OpenAI key in Supabase secrets, relay never needs it | v1.3 |
+| Memory-only semantic search | Thread messages already have recency context; memory search adds most value | v1.3 |
 
 ---
 
@@ -83,7 +86,12 @@
 **Delivered:** Stream-json NDJSON parsing, activity-based timeout, typing indicators, tool-use progress
 **Archive:** [Roadmap](milestones/v1.2-ROADMAP.md) | [Requirements](milestones/v1.2-REQUIREMENTS.md)
 
+### Milestone 1.3: Smart Memory
+**Goal:** Evolve flat memory into typed system with goals tracking and semantic search.
+**Status:** In progress (3 phases: 14-16)
+**Origin:** Upstream commit [fced316](https://github.com/rafael-agilize/claude-telegram-relay/commit/fced3162c65657635e97164f7ba4f519e145283a)
+
 </details>
 
 ---
-*Last updated: 2026-02-13 — Milestone v1.2 complete*
+*Last updated: 2026-02-13 — Milestone v1.3 started*

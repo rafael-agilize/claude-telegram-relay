@@ -2,16 +2,24 @@
 
 ## Current Position
 
-Phase: None — milestone v1.2 archived
-Status: Idle (ready for /gsd:new-milestone)
-Last activity: 2026-02-13 -- Milestone v1.2 archived
+Phase: None — milestone v1.3 roadmap created, ready for `/gsd:plan-phase 14`
+Status: Planning
+Last activity: 2026-02-13 — Milestone v1.3 roadmap created
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-02-13)
 
 **Core value:** Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, and real-time feedback
-**Current focus:** None — between milestones
+**Current focus:** v1.3 Smart Memory — typed memory, goals lifecycle, semantic search
+
+## Milestone v1.3 Progress
+
+| Phase | Name | Status | Requirements |
+|-------|------|--------|-------------|
+| 14 | Schema Migration & Typed Memory | Pending | R1, R12, NF3 |
+| 15 | Intent System Upgrade | Pending | R2, R3, R4, R5, R6, R11 |
+| 16 | Semantic Search via Edge Functions | Pending | R7, R8, R9, R10, NF1, NF2 |
 
 ## Performance Metrics
 
@@ -33,8 +41,8 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 
 ## Session Continuity
 
-**Last session:** 2026-02-13 -- Milestone v1.2 archived
-**Next action:** Run `/gsd:new-milestone` when ready to start the next version
+**Last session:** 2026-02-13 — Milestone v1.3 roadmap created
+**Next action:** Run `/gsd:plan-phase 14` to plan the schema migration
 
 ---
 

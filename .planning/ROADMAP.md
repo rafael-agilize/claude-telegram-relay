@@ -1,8 +1,45 @@
 # ROADMAP.md
 
-## Active Milestone
+## Active Milestone: v1.3 — Smart Memory
 
-None — ready for `/gsd:new-milestone`
+**Goal:** Evolve flat memory into typed system with goals tracking and semantic search, adapting upstream's memory module to our threaded architecture.
+
+**Origin:** Upstream commit [fced316](https://github.com/rafael-agilize/claude-telegram-relay/commit/fced3162c65657635e97164f7ba4f519e145283a)
+
+### Phase 14: Schema Migration & Typed Memory
+**Goal:** Evolve `global_memory` table to support typed entries with embeddings.
+**Requirements:** R1, R12, NF3
+**Delivers:**
+- Migration SQL: add `type`, `deadline`, `completed_at`, `priority`, `embedding` columns to `global_memory`
+- Enable `vector` and `pg_net` extensions
+- Create `match_memory()`, `get_facts()`, `get_active_goals()` RPCs
+- Backfill existing rows as type `fact`
+- Update reference schema (`examples/supabase-schema-v2.sql`)
+
+### Phase 15: Intent System Upgrade
+**Goal:** Rename tags to upstream convention and add goals lifecycle intents.
+**Requirements:** R2, R3, R4, R5, R6, R11
+**Delivers:**
+- Rename `[LEARN:]` → `[REMEMBER:]` in `processIntents()` and all `buildPrompt()` instructions
+- Add `[GOAL: text]` and `[GOAL: text | DEADLINE: date]` intent parsing
+- Add `[DONE: search text]` intent parsing (marks goal as completed)
+- Keep `[FORGET:]` unchanged
+- Update `/memory` command to show facts + active goals separately
+- Update `insertGlobalMemory()` to accept type parameter
+- Rename functions: `insertGlobalMemory` → `insertMemory`, `deleteGlobalMemory` → `deleteMemory`, `getGlobalMemory` → `getMemoryContext`
+
+### Phase 16: Semantic Search via Edge Functions
+**Goal:** Add auto-embedding and semantic search powered by OpenAI embeddings in Supabase.
+**Requirements:** R7, R8, R9, R10, NF1, NF2
+**Delivers:**
+- `supabase/functions/embed/index.ts` — auto-embed on INSERT via database webhook
+- `supabase/functions/search/index.ts` — semantic search via query embedding + `match_memory()` RPC
+- `getRelevantMemory(query)` function in relay that invokes search Edge Function
+- Integration in `buildPrompt()` — append `RELEVANT MEMORIES:` section
+- Graceful fallback (empty result) when Edge Functions unavailable
+- Setup documentation (webhook config, Supabase secrets)
+
+---
 
 ## Completed Milestones
 
@@ -12,4 +49,4 @@ None — ready for `/gsd:new-milestone`
 
 ---
 
-*Last updated: 2026-02-13 — Milestone v1.2 archived*
+*Last updated: 2026-02-13 — Milestone v1.3 created*
