@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 13 - Liveness & Progress
-Plan: Not yet created
-Status: Pending (needs /gsd:plan-phase 13)
-Last activity: 2026-02-13 -- Phase 12 Streaming Engine complete
+Plan: .planning/phases/13-liveness-progress/PLAN.md
+Status: Complete
+Last activity: 2026-02-13 -- Phase 13 Liveness & Progress complete
 
-**Progress:** [##########░░░░░░░░░░] 1/2 phases
+**Progress:** [████████████████████] 2/2 phases
 
 ## Project Reference
 
@@ -22,13 +22,13 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 - Phases: 2 total (Phase 12-13)
 - Requirements: 9 total
 - Coverage: 9/9 (100%)
-- Completed: 1/2 phases
+- Completed: 2/2 phases
 - Started: 2026-02-13
 
 | Phase | Name | Duration | Tasks | Files | Status |
 |-------|------|----------|-------|-------|--------|
 | 12 | Streaming Engine | ~3 min | 3 | 3 | Complete |
-| 13 | Liveness & Progress | — | — | — | Pending |
+| 13 | Liveness & Progress | ~3 min | 4 | 2 | Complete |
 
 **Milestone 1.1 (archived):**
 - Phases: 6 total (Phase 6-11)
@@ -56,7 +56,7 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 - `CLAUDE_INACTIVITY_TIMEOUT_MS`: relay.ts line 70 — 15 min (stream-json events reset timer)
 - `killOrphanedProcesses()`: relay.ts line 76 — orphan cleanup after timeout
 - `resetInactivityTimer()`: relay.ts — resets on every stream-json event from stdout
-- Typing action: sent once per handler at lines ~2113, ~2151, ~2202, ~2244
+- Liveness reporter: `createLivenessReporter()` — typing indicators every 4s + throttled progress messages every 15s
 
 ## Decisions
 
@@ -66,16 +66,17 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 
 ## Session Continuity
 
-**Last session:** 2026-02-13 -- Completed Phase 12 Streaming Engine
-**Stopped at:** Completed 12-streaming-engine-PLAN.md
+**Last session:** 2026-02-13 -- Completed Phase 13 Liveness & Progress
+**Stopped at:** Completed 13-liveness-progress-PLAN.md
 
-**Next action:** Run `/gsd:plan-phase 13` to create execution plan for Liveness & Progress phase
+**Next action:** Run `/gsd:complete-milestone` to archive milestone v1.2
 
 **Context for next session:**
-- Phase 12 complete: callClaude() now uses stream-json NDJSON parsing
-- All callers (handlers, heartbeat, cron, summary) work unchanged
-- Phase 13 will add typing indicators and progress messages on top of the streaming infrastructure
-- Stream events are available for Phase 13 to hook into (assistant events for typing, tool_use for progress)
+- Phase 12 complete: callClaude() uses stream-json NDJSON parsing
+- Phase 13 complete: Liveness reporter with typing indicators (4s) and throttled progress messages (15s)
+- All 4 message handlers wired with createLivenessReporter()
+- Heartbeat and cron callers unchanged (no liveness indicators for background tasks)
+- Milestone v1.2 fully complete — all 9 requirements covered
 
 ---
 

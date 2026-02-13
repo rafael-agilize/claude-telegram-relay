@@ -1698,12 +1698,132 @@ bot.use(async (ctx, next) => {
 });
 
 // ============================================================
+// LIVENESS & PROGRESS INDICATORS
+// ============================================================
+
+const TYPING_INTERVAL_MS = 4_000; // Send typing action every 4s (expires after ~5s)
+const PROGRESS_THROTTLE_MS = 15_000; // Max 1 progress message per 15s
+
+// Map Claude CLI tool names to user-friendly descriptions
+const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  Read: "Reading file",
+  Write: "Writing file",
+  Edit: "Editing file",
+  Bash: "Running command",
+  Glob: "Searching files",
+  Grep: "Searching code",
+  WebSearch: "Searching the web",
+  WebFetch: "Fetching web page",
+  Task: "Running sub-agent",
+  NotebookEdit: "Editing notebook",
+  EnterPlanMode: "Planning",
+  AskUserQuestion: "Asking question",
+};
+
+function formatToolName(name: string): string {
+  return TOOL_DISPLAY_NAMES[name] || name;
+}
+
+interface LivenessReporter {
+  onStreamEvent: (event: any) => void;
+  cleanup: () => Promise<void>;
+}
+
+function createLivenessReporter(
+  chatId: number,
+  messageThreadId?: number
+): LivenessReporter {
+  // LIVE-01: Continuous typing indicator
+  const typingInterval = setInterval(() => {
+    bot.api
+      .sendChatAction(chatId, "typing", {
+        message_thread_id: messageThreadId,
+      })
+      .catch(() => {}); // Silently ignore errors (chat may be unavailable)
+  }, TYPING_INTERVAL_MS);
+
+  // PROG-01 + PROG-02: Throttled progress messages
+  let statusMessageId: number | null = null;
+  let lastProgressAt = 0;
+  let pendingTools: string[] = [];
+  let sendingProgress = false; // Guard against overlapping sends
+
+  const sendOrUpdateProgress = async (toolNames: string[]) => {
+    if (sendingProgress) {
+      pendingTools.push(...toolNames);
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastProgressAt < PROGRESS_THROTTLE_MS) {
+      pendingTools.push(...toolNames);
+      return;
+    }
+
+    sendingProgress = true;
+    const allTools = [...pendingTools, ...toolNames];
+    pendingTools = [];
+    lastProgressAt = now;
+
+    // Deduplicate tool names while preserving order
+    const unique = [...new Set(allTools)];
+    const display = unique.map(formatToolName).join(", ");
+    const text = `🔄 ${display}...`;
+
+    try {
+      if (statusMessageId) {
+        await bot.api.editMessageText(chatId, statusMessageId, text);
+      } else {
+        const msg = await bot.api.sendMessage(chatId, text, {
+          message_thread_id: messageThreadId,
+        });
+        statusMessageId = msg.message_id;
+      }
+    } catch {
+      // Edit/send failed (message deleted, chat unavailable) — ignore
+    } finally {
+      sendingProgress = false;
+    }
+  };
+
+  const onStreamEvent = (event: any) => {
+    // Detect tool_use blocks in assistant events
+    if (event.type === "assistant" && event.message?.content) {
+      const toolNames: string[] = [];
+      for (const block of event.message.content) {
+        if (block.type === "tool_use" && block.name) {
+          toolNames.push(block.name);
+        }
+      }
+      if (toolNames.length > 0) {
+        sendOrUpdateProgress(toolNames); // Fire-and-forget (async but not awaited)
+      }
+    }
+  };
+
+  // LIVE-02: Cleanup stops all indicators
+  const cleanup = async () => {
+    clearInterval(typingInterval);
+    if (statusMessageId) {
+      try {
+        await bot.api.deleteMessage(chatId, statusMessageId);
+      } catch {
+        // Message already deleted or chat unavailable — ignore
+      }
+    }
+  };
+
+  return { onStreamEvent, cleanup };
+}
+
+// ============================================================
 // CORE: Call Claude CLI
 // ============================================================
 
 async function callClaude(
   prompt: string,
-  threadInfo?: ThreadInfo
+  threadInfo?: ThreadInfo,
+  onStreamEvent?: (event: any) => void
 ): Promise<{ text: string; sessionId: string | null }> {
   const args = [CLAUDE_PATH, "-p", prompt];
 
@@ -1823,6 +1943,8 @@ async function callClaude(
                 newSessionId = event.session_id;
               }
             }
+            // Fire callback for callers that want real-time event access
+            onStreamEvent?.(event);
           } catch {
             // Non-JSON line or partial data — skip silently
           }
@@ -1847,6 +1969,7 @@ async function callClaude(
           newSessionId = event.session_id;
         }
         resetInactivityTimer();
+        onStreamEvent?.(event);
       } catch {
         // Incomplete JSON at end — ignore
       }
@@ -1868,7 +1991,7 @@ async function callClaude(
       // If we used --resume and it failed, retry without it (session may be expired/corrupt)
       if (threadInfo?.sessionId) {
         console.warn(`Session ${threadInfo.sessionId} failed (exit ${exitCode}), starting fresh`);
-        return callClaude(prompt, { ...threadInfo, sessionId: null });
+        return callClaude(prompt, { ...threadInfo, sessionId: null }, onStreamEvent);
       }
       console.error("Claude error:", stderrText);
       return { text: "Sorry, something went wrong processing your request. Please try again.", sessionId: null };
@@ -2179,10 +2302,12 @@ bot.on("message:text", async (ctx) => {
   const text = ctx.message.text;
   console.log(`Message: ${text.substring(0, 80)}...`);
 
+  const liveness = createLivenessReporter(ctx.chat.id, ctx.message.message_thread_id);
+  try {
   await ctx.replyWithChatAction("typing");
 
   const enrichedPrompt = await buildPrompt(text, ctx.threadInfo);
-  const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo);
+  const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
   const response = await processIntents(rawResponse, ctx.threadInfo?.dbId);
 
   // Check if Claude included [VOICE_REPLY] tag
@@ -2212,11 +2337,15 @@ bot.on("message:text", async (ctx) => {
     }
   }
   await sendResponse(ctx, cleanResponse);
+  } finally {
+    await liveness.cleanup();
+  }
 });
 
 // Voice messages
 bot.on("message:voice", async (ctx) => {
   console.log("Voice message received");
+  const liveness = createLivenessReporter(ctx.chat.id, ctx.message.message_thread_id);
   await ctx.replyWithChatAction("typing");
 
   try {
@@ -2236,7 +2365,7 @@ bot.on("message:voice", async (ctx) => {
     console.log(`Transcription: ${transcription.substring(0, 80)}...`);
 
     const enrichedPrompt = await buildPrompt(transcription, ctx.threadInfo);
-    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo);
+    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
     const claudeResponse = await processIntents(rawResponse, ctx.threadInfo?.dbId);
 
     // V2 thread-aware logging
@@ -2262,12 +2391,15 @@ bot.on("message:voice", async (ctx) => {
   } catch (error) {
     console.error("Voice error:", error);
     await ctx.reply("Could not process voice message.");
+  } finally {
+    await liveness.cleanup();
   }
 });
 
 // Photos/Images
 bot.on("message:photo", async (ctx) => {
   console.log("Image received");
+  const liveness = createLivenessReporter(ctx.chat.id, ctx.message.message_thread_id);
   await ctx.replyWithChatAction("typing");
 
   try {
@@ -2286,7 +2418,7 @@ bot.on("message:photo", async (ctx) => {
 
     const caption = ctx.message.caption || "Analyze this image.";
     const enrichedPrompt = await buildPrompt(`[Image: ${filePath}]\n\n${caption}`, ctx.threadInfo);
-    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo);
+    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
     const claudeResponse = await processIntents(rawResponse, ctx.threadInfo?.dbId);
 
     await unlink(filePath).catch(() => {});
@@ -2303,6 +2435,8 @@ bot.on("message:photo", async (ctx) => {
   } catch (error) {
     console.error("Image error:", error);
     await ctx.reply("Could not process image.");
+  } finally {
+    await liveness.cleanup();
   }
 });
 
@@ -2310,6 +2444,7 @@ bot.on("message:photo", async (ctx) => {
 bot.on("message:document", async (ctx) => {
   const doc = ctx.message.document;
   console.log(`Document: ${doc.file_name}`);
+  const liveness = createLivenessReporter(ctx.chat.id, ctx.message.message_thread_id);
   await ctx.replyWithChatAction("typing");
 
   try {
@@ -2326,7 +2461,7 @@ bot.on("message:document", async (ctx) => {
 
     const caption = ctx.message.caption || `Analyze: ${doc.file_name}`;
     const enrichedPrompt = await buildPrompt(`[File: ${filePath}]\n\n${caption}`, ctx.threadInfo);
-    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo);
+    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
     const claudeResponse = await processIntents(rawResponse, ctx.threadInfo?.dbId);
 
     await unlink(filePath).catch(() => {});
@@ -2343,6 +2478,8 @@ bot.on("message:document", async (ctx) => {
   } catch (error) {
     console.error("Document error:", error);
     await ctx.reply("Could not process document.");
+  } finally {
+    await liveness.cleanup();
   }
 });
 
