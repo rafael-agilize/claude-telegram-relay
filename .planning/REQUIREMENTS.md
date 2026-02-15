@@ -1,0 +1,108 @@
+# Requirements: Claude Telegram Relay
+
+**Defined:** 2026-02-15
+**Core Value:** Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, semantic search, and real-time feedback
+
+## v1.4 Requirements
+
+Requirements for Soul Evolution milestone. Each maps to roadmap phases.
+
+### Schema & Migration
+
+- [ ] **SCHEMA-01**: Soul versions table stores daily snapshots with core_identity, active_values, recent_growth, reflection_notes, token_count, and version number
+- [ ] **SCHEMA-02**: Soul milestones table stores formative events with emotional weight (formative/meaningful/challenging) and lesson_learned
+- [ ] **SCHEMA-03**: Migration preserves current bot_soul content as the seed for Layer 1 (Core Identity)
+- [ ] **SCHEMA-04**: Supabase RPCs for soul version CRUD (get_current_soul, save_soul_version, get_soul_history)
+- [ ] **SCHEMA-05**: Supabase RPCs for milestone moments CRUD (save_milestone_moment, get_milestone_moments)
+
+### Evolution Engine
+
+- [ ] **EVOL-01**: Daily cron job (configurable time, default midnight) triggers soul reflection
+- [ ] **EVOL-02**: Reflection pulls last 24h interactions from thread_messages across all threads
+- [ ] **EVOL-03**: Reflection receives current 3-layer soul + recent soul versions for continuity
+- [ ] **EVOL-04**: Claude reflection call generates new 3-layer soul compressed within 800-token budget
+- [ ] **EVOL-05**: Old soul saved as version in soul_versions before update
+- [ ] **EVOL-06**: New soul text sent to Rafa via Telegram (observer report, not approval gate)
+- [ ] **EVOL-07**: Milestone moments consulted during daily reflection for personality anchoring
+- [ ] **EVOL-08**: Evolution always trends upward — reflection prompt enforces growth, no regression
+- [ ] **EVOL-09**: User can pause the daily evolution loop (bot keeps current soul)
+- [ ] **EVOL-10**: User can resume the daily evolution loop
+
+### Prompt Integration
+
+- [ ] **PROMPT-01**: buildPrompt() injects 3-layer soul structure (Core Identity + Active Values + Recent Growth)
+- [ ] **PROMPT-02**: Active soul in prompt never exceeds 800 tokens (enforced at generation time)
+- [ ] **PROMPT-03**: Full soul history and milestones stay in Supabase, never in prompt
+
+### Milestone Moments
+
+- [ ] **MOMENT-01**: Bot can detect formative moments during normal interactions (automatic)
+- [ ] **MOMENT-02**: New intent [MILESTONE:] allows bot to explicitly tag a moment with emotional weight and lesson
+- [ ] **MOMENT-03**: Milestone moments stored with emotional weight classification and lesson_learned distillation
+
+### Soul Control
+
+- [ ] **CTRL-01**: User can roll back to a specific soul version via Telegram command
+- [ ] **CTRL-02**: /soul pause and /soul resume toggle the evolution loop
+- [ ] **CTRL-03**: /soul history shows recent soul versions with version numbers
+- [ ] **CTRL-04**: /soul rollback <version> restores a previous soul version as active
+
+## Future Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Advanced Evolution
+
+- **ADV-01**: Evolution influenced by external feedback (user ratings on soul quality)
+- **ADV-02**: Multi-persona support (different souls for different contexts)
+- **ADV-03**: Soul evolution visualization (trend graphs, personality drift analysis)
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| User-facing commands to edit individual soul layers | /soul resets seed if needed; granular editing adds complexity |
+| Multi-persona / multiple souls | Single evolving identity by design |
+| Sharing soul evolution externally | Rafa-only observer |
+| Soul editing via web UI | No web dashboard exists |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| SCHEMA-01 | — | Pending |
+| SCHEMA-02 | — | Pending |
+| SCHEMA-03 | — | Pending |
+| SCHEMA-04 | — | Pending |
+| SCHEMA-05 | — | Pending |
+| EVOL-01 | — | Pending |
+| EVOL-02 | — | Pending |
+| EVOL-03 | — | Pending |
+| EVOL-04 | — | Pending |
+| EVOL-05 | — | Pending |
+| EVOL-06 | — | Pending |
+| EVOL-07 | — | Pending |
+| EVOL-08 | — | Pending |
+| EVOL-09 | — | Pending |
+| EVOL-10 | — | Pending |
+| PROMPT-01 | — | Pending |
+| PROMPT-02 | — | Pending |
+| PROMPT-03 | — | Pending |
+| MOMENT-01 | — | Pending |
+| MOMENT-02 | — | Pending |
+| MOMENT-03 | — | Pending |
+| CTRL-01 | — | Pending |
+| CTRL-02 | — | Pending |
+| CTRL-03 | — | Pending |
+| CTRL-04 | — | Pending |
+
+**Coverage:**
+- v1.4 requirements: 25 total
+- Mapped to phases: 0
+- Unmapped: 25 ⚠️
+
+---
+*Requirements defined: 2026-02-15*
+*Last updated: 2026-02-15 after initial definition*
