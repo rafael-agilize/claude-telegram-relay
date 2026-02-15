@@ -72,37 +72,37 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCHEMA-01 | — | Pending |
-| SCHEMA-02 | — | Pending |
-| SCHEMA-03 | — | Pending |
-| SCHEMA-04 | — | Pending |
-| SCHEMA-05 | — | Pending |
-| EVOL-01 | — | Pending |
-| EVOL-02 | — | Pending |
-| EVOL-03 | — | Pending |
-| EVOL-04 | — | Pending |
-| EVOL-05 | — | Pending |
-| EVOL-06 | — | Pending |
-| EVOL-07 | — | Pending |
-| EVOL-08 | — | Pending |
-| EVOL-09 | — | Pending |
-| EVOL-10 | — | Pending |
-| PROMPT-01 | — | Pending |
-| PROMPT-02 | — | Pending |
-| PROMPT-03 | — | Pending |
-| MOMENT-01 | — | Pending |
-| MOMENT-02 | — | Pending |
-| MOMENT-03 | — | Pending |
-| CTRL-01 | — | Pending |
-| CTRL-02 | — | Pending |
-| CTRL-03 | — | Pending |
-| CTRL-04 | — | Pending |
+| SCHEMA-01 | Phase 17 | Pending |
+| SCHEMA-02 | Phase 17 | Pending |
+| SCHEMA-03 | Phase 17 | Pending |
+| SCHEMA-04 | Phase 17 | Pending |
+| SCHEMA-05 | Phase 17 | Pending |
+| PROMPT-01 | Phase 18 | Pending |
+| PROMPT-02 | Phase 18 | Pending |
+| PROMPT-03 | Phase 18 | Pending |
+| EVOL-01 | Phase 19 | Pending |
+| EVOL-02 | Phase 19 | Pending |
+| EVOL-03 | Phase 19 | Pending |
+| EVOL-04 | Phase 19 | Pending |
+| EVOL-05 | Phase 19 | Pending |
+| EVOL-06 | Phase 19 | Pending |
+| MOMENT-01 | Phase 20 | Pending |
+| MOMENT-02 | Phase 20 | Pending |
+| MOMENT-03 | Phase 20 | Pending |
+| EVOL-07 | Phase 20 | Pending |
+| EVOL-09 | Phase 21 | Pending |
+| EVOL-10 | Phase 21 | Pending |
+| CTRL-01 | Phase 21 | Pending |
+| CTRL-02 | Phase 21 | Pending |
+| CTRL-03 | Phase 21 | Pending |
+| CTRL-04 | Phase 21 | Pending |
+| EVOL-08 | Phase 22 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 25 total
-- Mapped to phases: 0
-- Unmapped: 25 ⚠️
+- Mapped to phases: 25
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-15*
-*Last updated: 2026-02-15 after initial definition*
+*Last updated: 2026-02-15 after roadmap creation*
