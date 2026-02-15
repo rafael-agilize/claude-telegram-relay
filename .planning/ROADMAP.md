@@ -139,12 +139,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Current bot_soul content is preserved as seed in new schema (Core Identity Layer 1)
   4. Supabase RPCs exist for soul CRUD (get_current_soul, save_soul_version, get_soul_history)
   5. Supabase RPCs exist for milestone CRUD (save_milestone_moment, get_milestone_moments)
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 17-01: Create migration SQL for soul_versions and soul_milestones tables
-- [ ] 17-02: Implement Supabase RPCs for soul and milestone operations
-- [ ] 17-03: Test schema with sample soul evolution data
+- [ ] 17-01-PLAN.md — Migration SQL for soul_versions and soul_milestones tables + reference schema
+- [ ] 17-02-PLAN.md — Supabase RPCs for soul and milestone CRUD operations + reference schema
 
 ### Phase 18: Prompt Integration
 **Goal**: Every Claude interaction uses 3-layer soul structure instead of flat content
@@ -254,7 +253,7 @@ Phases execute in numeric order: 17 → 18 → 19 → 20 → 21 → 22
 | 14. Typed Memory System | v1.3 | 2/2 | Complete | 2026-02-13 |
 | 15. Goals Lifecycle | v1.3 | 2/2 | Complete | 2026-02-13 |
 | 16. Semantic Search | v1.3 | 3/3 | Complete | 2026-02-13 |
-| 17. Three-Layer Soul Schema | v1.4 | 0/3 | Not started | - |
+| 17. Three-Layer Soul Schema | v1.4 | 0/2 | Not started | - |
 | 18. Prompt Integration | v1.4 | 0/3 | Not started | - |
 | 19. Daily Evolution Engine | v1.4 | 0/4 | Not started | - |
 | 20. Milestone Moments | v1.4 | 0/3 | Not started | - |

@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 
 | Phase | Plans | Status |
 |-------|-------|--------|
-| 17. Three-Layer Soul Schema | 0/3 | Not started |
+| 17. Three-Layer Soul Schema | 0/2 | Not started |
 | 18. Prompt Integration | 0/3 | Not started |
 | 19. Daily Evolution Engine | 0/4 | Not started |
 | 20. Milestone Moments | 0/3 | Not started |
