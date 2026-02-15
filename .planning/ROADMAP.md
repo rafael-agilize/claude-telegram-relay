@@ -120,7 +120,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Milestone Goal:** Transform static bot soul into self-evolving personality system with daily reflection, compressed 3-layer structure, milestone moments, and full version history.
 
-- [ ] **Phase 17: Three-Layer Soul Schema** - Database foundation with soul_versions and soul_milestones tables
+- [x] **Phase 17: Three-Layer Soul Schema** - Database foundation with soul_versions and soul_milestones tables (completed 2026-02-15)
 - [ ] **Phase 18: Prompt Integration** - buildPrompt() uses 3-layer soul structure within 800-token budget
 - [ ] **Phase 19: Daily Evolution Engine** - Cron-triggered reflection that generates new soul versions
 - [ ] **Phase 20: Milestone Moments** - Formative event detection with emotional weight
@@ -139,7 +139,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Current bot_soul content is preserved as seed in new schema (Core Identity Layer 1)
   4. Supabase RPCs exist for soul CRUD (get_current_soul, save_soul_version, get_soul_history)
   5. Supabase RPCs exist for milestone CRUD (save_milestone_moment, get_milestone_moments)
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 17-01-PLAN.md — Migration SQL for soul_versions and soul_milestones tables + reference schema
@@ -253,7 +253,7 @@ Phases execute in numeric order: 17 → 18 → 19 → 20 → 21 → 22
 | 14. Typed Memory System | v1.3 | 2/2 | Complete | 2026-02-13 |
 | 15. Goals Lifecycle | v1.3 | 2/2 | Complete | 2026-02-13 |
 | 16. Semantic Search | v1.3 | 3/3 | Complete | 2026-02-13 |
-| 17. Three-Layer Soul Schema | v1.4 | 0/2 | Not started | - |
+| 17. Three-Layer Soul Schema | v1.4 | Complete    | 2026-02-15 | - |
 | 18. Prompt Integration | v1.4 | 0/3 | Not started | - |
 | 19. Daily Evolution Engine | v1.4 | 0/4 | Not started | - |
 | 20. Milestone Moments | v1.4 | 0/3 | Not started | - |
