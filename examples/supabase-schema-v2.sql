@@ -87,6 +87,47 @@ VALUES ('You are a helpful, concise assistant responding via Telegram.', true)
 ON CONFLICT DO NOTHING;
 
 -- ============================================================
+-- SOUL VERSIONS TABLE (Three-layer compressed soul for evolution)
+-- ============================================================
+-- Stores versioned snapshots of the bot's personality.
+-- Three layers balance depth vs token efficiency:
+--   Layer 1 (core_identity): Who I am (~200 tokens, stable)
+--   Layer 2 (active_values): What I care about now (~300 tokens)
+--   Layer 3 (recent_growth): What I learned recently (~300 tokens)
+CREATE TABLE IF NOT EXISTS soul_versions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  version INTEGER NOT NULL,
+  core_identity TEXT NOT NULL,        -- Layer 1: Who I am (stable, ~200 tokens)
+  active_values TEXT NOT NULL,        -- Layer 2: What I care about now (~300 tokens)
+  recent_growth TEXT NOT NULL,        -- Layer 3: What I learned recently (~300 tokens)
+  reflection_notes TEXT,              -- Uncompressed journal entry (not loaded into prompt)
+  token_count INTEGER NOT NULL DEFAULT 0,  -- Actual token count of L1+L2+L3 combined
+  UNIQUE(version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_soul_versions_created ON soul_versions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_soul_versions_version ON soul_versions(version DESC);
+
+-- ============================================================
+-- SOUL MILESTONES TABLE (Formative events that anchor personality)
+-- ============================================================
+-- Stores key moments that shaped the bot's personality evolution.
+-- Prevents drift by preserving lessons learned from significant events.
+CREATE TABLE IF NOT EXISTS soul_milestones (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  event_description TEXT NOT NULL,
+  emotional_weight TEXT NOT NULL DEFAULT 'meaningful'
+    CHECK (emotional_weight IN ('formative', 'meaningful', 'challenging')),
+  lesson_learned TEXT NOT NULL,
+  source_thread_id UUID REFERENCES threads(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_soul_milestones_created ON soul_milestones(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_soul_milestones_weight ON soul_milestones(emotional_weight);
+
+-- ============================================================
 -- LOGS TABLE (Observability - updated with thread_id)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS logs_v2 (
@@ -110,6 +151,8 @@ ALTER TABLE threads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE thread_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE global_memory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bot_soul ENABLE ROW LEVEL SECURITY;
+ALTER TABLE soul_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE soul_milestones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE logs_v2 ENABLE ROW LEVEL SECURITY;
 
 -- Allow all for service role ONLY (bot uses service key)
@@ -122,6 +165,10 @@ CREATE POLICY "service_role_all" ON thread_messages FOR ALL
 CREATE POLICY "service_role_all" ON global_memory FOR ALL
   TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "service_role_all" ON bot_soul FOR ALL
+  TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_all" ON soul_versions FOR ALL
+  TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_all" ON soul_milestones FOR ALL
   TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "service_role_all" ON logs_v2 FOR ALL
   TO service_role USING (true) WITH CHECK (true);
