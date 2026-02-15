@@ -2,16 +2,17 @@
 
 ## Current Position
 
-Phase: — (no active milestone)
-Status: v1.3 archived, ready for next milestone
-Last activity: 2026-02-13 — Milestone v1.3 archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-15 — Milestone v1.4 started
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-13)
+See: .planning/PROJECT.md (updated 2026-02-15)
 
 **Core value:** Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, semantic search, and real-time feedback
-**Current focus:** None — ready for `/gsd:new-milestone`
+**Current focus:** v1.4 Soul Evolution — self-evolving personality system
 
 ## Shipped Milestones
 
@@ -26,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 
 ## Session Continuity
 
-**Last session:** 2026-02-13 — v1.3 archived (typed memory, goals, semantic search)
-**Next action:** Run `/gsd:new-milestone` to define next version
+**Last session:** 2026-02-15 — v1.4 milestone started (Soul Evolution)
+**Next action:** Define requirements and create roadmap
 
 ---
 
-*Updated: 2026-02-13*
+*Updated: 2026-02-15*

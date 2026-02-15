@@ -11,7 +11,19 @@
 ## Current State
 
 **Latest version:** v1.3 (shipped 2026-02-13)
-**Active milestone:** None — ready for next milestone
+**Active milestone:** v1.4 — Soul Evolution
+
+## Current Milestone: v1.4 Soul Evolution
+
+**Goal:** Transform the static bot soul into a self-evolving personality system inspired by Stoic journaling — the bot reflects daily on interactions, distills lessons, and updates its own identity while staying token-conscious.
+
+**Target features:**
+- Compression Pyramid: 3-layer soul structure (Core Identity + Active Values + Recent Growth) capped at ~800 tokens
+- Daily Evolution Ritual: cron-triggered reflection that analyzes interactions and updates the soul
+- Soul Versioning: full history of every daily soul snapshot with uncompressed journal entries
+- Milestone Moments: formative events tagged with emotional weight, consulted during evolution
+- buildPrompt() integration: replace flat soul injection with 3-layer structure
+- Full autonomy: bot evolves without approval, Rafa observes via daily Telegram report
 
 **Shipped capabilities:**
 - Telegram group threads as parallel conversation channels
@@ -37,6 +49,9 @@
 - Web dashboard -- overkill for single-user
 - Semantic/vector search on thread_messages -- memory-only semantic search sufficient for now
 - Multi-channel support (WhatsApp, Slack, etc.) -- Telegram-only by design
+- User-facing commands to edit individual soul layers -- /soul resets seed if needed
+- Multi-persona / multiple souls -- single evolving identity
+- Sharing soul evolution externally -- Rafa-only observer
 
 ## Context
 
@@ -102,4 +117,4 @@
 </details>
 
 ---
-*Last updated: 2026-02-13 — v1.3 shipped*
+*Last updated: 2026-02-15 — v1.4 milestone started*
