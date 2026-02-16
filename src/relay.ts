@@ -1313,6 +1313,87 @@ let heartbeatRunning = false;
 // Cache for heartbeat topic thread ID (persisted in Supabase threads table)
 let heartbeatTopicId: number | null = null;
 
+// ============================================================
+// EVOLUTION TIMER (Infrastructure — Phase 19)
+// ============================================================
+
+let evolutionTimer: ReturnType<typeof setInterval> | null = null;
+let evolutionRunning = false;
+let lastEvolutionDate: string | null = null; // Daily dedup: "2026-02-15"
+const EVOLUTION_HOUR = parseInt(process.env.EVOLUTION_HOUR || "0"); // 0 = midnight
+const EVOLUTION_TIMEZONE = process.env.EVOLUTION_TIMEZONE || "America/Sao_Paulo";
+
+async function evolutionTick(): Promise<void> {
+  // Guard against overlapping runs
+  if (evolutionRunning) {
+    console.log("Evolution: skipping (previous tick still running)");
+    return;
+  }
+
+  evolutionRunning = true;
+  try {
+    // Check if current hour matches configured evolution hour
+    const now = new Date();
+    const currentHour = parseInt(
+      now.toLocaleString("en-US", {
+        timeZone: EVOLUTION_TIMEZONE,
+        hour: "numeric",
+        hour12: false,
+      })
+    );
+
+    if (currentHour !== EVOLUTION_HOUR) {
+      // Not the right hour yet, return silently
+      return;
+    }
+
+    // Daily dedup: check if already ran today
+    const todayDate = now.toLocaleString("en-US", {
+      timeZone: EVOLUTION_TIMEZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).split("/").reverse().join("-"); // "2026-02-15"
+
+    if (lastEvolutionDate === todayDate) {
+      console.log("Evolution: already ran today, skipping");
+      return;
+    }
+
+    console.log("Evolution: tick triggered");
+    await logEventV2("evolution_tick", "Evolution timer fired at configured hour", {
+      hour: EVOLUTION_HOUR,
+      timezone: EVOLUTION_TIMEZONE,
+    });
+
+    // Update last run date
+    lastEvolutionDate = todayDate;
+
+    // TODO (Plan 02): Call evolution reflection logic here
+    console.log("Evolution: tick triggered, ready for reflection (logic in Plan 02)");
+  } catch (e) {
+    console.error("Evolution tick error:", e);
+    await logEventV2("evolution_error", String(e).substring(0, 200));
+  } finally {
+    evolutionRunning = false;
+  }
+}
+
+function startEvolutionTimer(): void {
+  if (evolutionTimer) clearInterval(evolutionTimer);
+  // Check every 30 minutes, but only trigger at configured hour
+  evolutionTimer = setInterval(evolutionTick, 30 * 60 * 1000);
+  console.log(`Evolution: started (checking every 30min, triggers at hour ${EVOLUTION_HOUR} ${EVOLUTION_TIMEZONE})`);
+}
+
+function stopEvolutionTimer(): void {
+  if (evolutionTimer) {
+    clearInterval(evolutionTimer);
+    evolutionTimer = null;
+    console.log("Evolution: stopped");
+  }
+}
+
 async function readHeartbeatChecklist(): Promise<string> {
   if (!PROJECT_DIR) return "";
   try {
@@ -1913,6 +1994,7 @@ process.on("exit", () => {
 process.on("SIGINT", async () => {
   stopHeartbeat();
   stopCronScheduler();
+  stopEvolutionTimer();
   await logEventV2("bot_stopping", "Relay shutting down (SIGINT)");
   await releaseLock();
   process.exit(0);
@@ -1920,6 +2002,7 @@ process.on("SIGINT", async () => {
 process.on("SIGTERM", async () => {
   stopHeartbeat();
   stopCronScheduler();
+  stopEvolutionTimer();
   await logEventV2("bot_stopping", "Relay shutting down (SIGTERM)");
   await releaseLock();
   process.exit(0);
@@ -3159,5 +3242,8 @@ bot.start({
 
     // Start cron scheduler
     startCronScheduler();
+
+    // Start evolution timer
+    startEvolutionTimer();
   },
 });
