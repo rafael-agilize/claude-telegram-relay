@@ -2,89 +2,103 @@
 
 ## Project: Claude Telegram Relay
 
-**Description:** A relay that bridges Telegram to the Claude Code CLI with persistent memory, voice I/O, proactive agent capabilities, and unrestricted permissions.
+**Description:** A relay that bridges Telegram to the Claude Code CLI with persistent memory, voice I/O, proactive agent capabilities, self-evolving personality, and unrestricted permissions.
 
 **Tech Stack:** Bun runtime, TypeScript, Grammy (Telegram Bot), Supabase (PostgreSQL + Edge Functions), Claude CLI, Groq Whisper, ElevenLabs TTS, croner (cron scheduling), OpenAI Embeddings (via Edge Functions)
 
-**Architecture:** Single-file relay (`src/relay.ts` ~2,800 lines) + 2 Supabase Edge Functions. Message flow: Telegram -> Grammy handler -> buildPrompt() -> callClaude() via Bun.spawn -> processIntents() -> response back to Telegram.
+**Architecture:** Single-file relay (`src/relay.ts` ~3,800 lines) + 2 Supabase Edge Functions. Message flow: Telegram -> Grammy handler -> buildPrompt() -> callClaude() via Bun.spawn -> processIntents() -> response back to Telegram.
 
 ## Current State
 
-**Latest version:** v1.3 (shipped 2026-02-13)
-**Active milestone:** v1.4 — Soul Evolution
+**Latest version:** v1.4 (shipped 2026-02-16)
+**Status:** All milestones complete. Ready for next milestone planning.
 
-## Current Milestone: v1.4 Soul Evolution
+## Core Value
 
-**Goal:** Transform the static bot soul into a self-evolving personality system inspired by Stoic journaling — the bot reflects daily on interactions, distills lessons, and updates its own identity while staying token-conscious.
+Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, semantic search, real-time feedback, and self-evolving personality.
 
-**Target features:**
-- Compression Pyramid: 3-layer soul structure (Core Identity + Active Values + Recent Growth) capped at ~800 tokens
-- Daily Evolution Ritual: cron-triggered reflection that analyzes interactions and updates the soul
-- Soul Versioning: full history of every daily soul snapshot with uncompressed journal entries
-- Milestone Moments: formative events tagged with emotional weight, consulted during evolution
-- buildPrompt() integration: replace flat soul injection with 3-layer structure
-- Full autonomy: bot evolves without approval, Rafa observes via daily Telegram report
+## Requirements
 
-**Shipped capabilities:**
-- Telegram group threads as parallel conversation channels
-- True Claude CLI conversation continuity via --resume per thread
-- Four-layer memory: recent messages, thread summary, global memory (facts/goals), semantic search
-- Typed memory system: facts, goals, completed goals, preferences
-- Goals lifecycle: [GOAL:] creation with optional deadlines, [DONE:] completion
-- Semantic search via Supabase Edge Functions + OpenAI text-embedding-3-small embeddings
-- Bot "soul" (personality) loaded in every interaction
-- Supabase v2 schema (threads, global_memory, bot_soul, logs_v2, cron_jobs, heartbeat_config)
-- Voice transcription (Groq Whisper) and TTS (ElevenLabs)
-- DM + supergroup Topics support
-- Intent system: [REMEMBER:], [FORGET:], [GOAL:], [DONE:], [VOICE_REPLY], [CRON:]
-- Heartbeat system: periodic agent loop with HEARTBEAT.md checklist, smart suppression, active hours, dedicated thread
-- Cron system: 3 schedule types (cron/interval/once), Telegram commands, file sync, agent self-scheduling
-- Stream-json NDJSON parsing with activity-based 15-min inactivity timeout
-- Real-time typing indicators (4s interval) and tool-use progress messages (15s throttle)
-- Graceful degradation: semantic search returns empty when Edge Functions unavailable
+### Validated
 
-## Out of Scope
+- ✓ Threaded conversations with per-thread Claude sessions — v1.0
+- ✓ Three-layer memory (recent messages, thread summary, global memory) — v1.0
+- ✓ Voice I/O (Groq Whisper + ElevenLabs TTS) — v1.0
+- ✓ Intent system ([REMEMBER:], [FORGET:], [VOICE_REPLY]) — v1.0
+- ✓ buildPrompt() context assembly — v1.0
+- ✓ Heartbeat system with HEARTBEAT.md, smart suppression, active hours — v1.1
+- ✓ Cron engine with 3 schedule types and agent self-scheduling — v1.1
+- ✓ Stream-json NDJSON parsing with activity-based timeout — v1.2
+- ✓ Real-time typing indicators and tool-use progress — v1.2
+- ✓ Typed memory (facts, goals, preferences) — v1.3
+- ✓ Goals lifecycle with [GOAL:]/[DONE:] intents — v1.3
+- ✓ Semantic search via Supabase Edge Functions — v1.3
+- ✓ 3-layer soul architecture (Core Identity + Active Values + Recent Growth) — v1.4
+- ✓ Daily soul evolution engine with midnight reflection — v1.4
+- ✓ Milestone moments with emotional weight — v1.4
+- ✓ Soul versioning, history, and rollback — v1.4
+- ✓ Evolution controls (pause/resume/status) — v1.4
+- ✓ Growth safeguards with anti-regression validation — v1.4
 
-- Multi-user support (still single authorized user) -- complexity, not needed
-- Web dashboard -- overkill for single-user
-- Semantic/vector search on thread_messages -- memory-only semantic search sufficient for now
-- Multi-channel support (WhatsApp, Slack, etc.) -- Telegram-only by design
-- User-facing commands to edit individual soul layers -- /soul resets seed if needed
-- Multi-persona / multiple souls -- single evolving identity
-- Sharing soul evolution externally -- Rafa-only observer
+### Active
+
+(None — ready for next milestone requirements)
+
+### Out of Scope
+
+- Multi-user support — single authorized user by design
+- Web dashboard — overkill for single-user
+- Semantic search on thread_messages — memory-only search sufficient
+- Multi-channel (WhatsApp, Slack) — Telegram-only by design
+- Editing individual soul layers via commands — /soul resets seed if needed
+- Multi-persona / multiple souls — single evolving identity
+- Soul evolution sharing — Rafa-only observer
+- Evolution influenced by user ratings — future consideration
+- Soul evolution visualization — future consideration
 
 ## Context
 
-- Inspired by OpenClaw (github.com/openclaw/openclaw) heartbeat and cron systems
-- OpenClaw uses a gateway architecture with 13+ channels; we stay lightweight single-file
-- Key adaptations: HEARTBEAT.md checklist, HEARTBEAT_OK suppression, active hours, croner library
-- Our relay spawns Claude CLI processes; OpenClaw uses embedded Pi agent RPC
-- Upstream memory system adapted from [fced316](https://github.com/rafael-agilize/claude-telegram-relay/commit/fced3162c65657635e97164f7ba4f519e145283a)
+Shipped v1.4 with 3,804 LOC TypeScript in `src/relay.ts` + 2 Edge Functions + 7 migrations.
+Tech stack: Bun, Grammy, Supabase, Claude CLI, Groq Whisper, ElevenLabs, croner, OpenAI Embeddings.
+5 milestones shipped (v1.0-v1.4), 22 phases, 45 plans executed over 7 days.
+
+Soul evolution system transforms static bot personality into a living, growing identity:
+- Compression pyramid keeps soul within 800-token budget
+- Daily reflection at midnight analyzes interactions and generates new soul version
+- Milestone moments anchor personality across evolution cycles
+- Full version history with rollback preserves safety net
+- Growth safeguards ensure upward trajectory
 
 ## Constraints
 
-- **Runtime**: Bun -- all scheduling must work with Bun's timer APIs
-- **Architecture**: Single-file relay -- all features integrate into relay.ts
-- **State**: Supabase -- all persistent state stored in cloud DB
-- **Cost**: Claude API calls per heartbeat/cron -- default 1h heartbeat interval to manage cost
-- **Embeddings**: OpenAI API key in Supabase secrets only -- relay never touches it
+- **Runtime**: Bun — all scheduling must work with Bun's timer APIs
+- **Architecture**: Single-file relay — all features integrate into relay.ts
+- **State**: Supabase — all persistent state stored in cloud DB
+- **Cost**: Claude API calls per heartbeat/cron/evolution — default 1h heartbeat, midnight evolution
+- **Embeddings**: OpenAI API key in Supabase secrets only — relay never touches it
+- **Soul budget**: 800 tokens max for active soul in prompt
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Dedicated heartbeat thread | Keeps proactive messages separate from conversations | Shipped v1.1 |
-| 1h default heartbeat interval | Balance responsiveness vs API cost | Shipped v1.1 |
-| Agent can self-schedule cron | Makes the assistant truly proactive (reminders, follow-ups) | Shipped v1.1 |
-| croner for cron expressions | Same library OpenClaw uses, 5-field cron + timezone support | Shipped v1.1 |
-| Both Telegram commands + file config for cron | Accessibility from phone + power user file editing | Shipped v1.1 |
-| stream-json over json output | Enables activity detection, progress feedback, and eliminates blind 5-min timeout | Shipped v1.2 |
-| 15-min inactivity timeout | Complex tasks (subagents, research) need more than 5 min between outputs | Shipped v1.2 |
-| Liveness reporter pattern | Factory + callback decouples typing/progress from callClaude internals | Shipped v1.2 |
-| Adopt upstream intent names | [REMEMBER:]/[GOAL:]/[DONE:] from upstream; keeps parity with fork source | Shipped v1.3 |
-| OpenAI embeddings via Edge Functions | Keeps OpenAI key in Supabase secrets, relay never needs it | Shipped v1.3 |
-| Memory-only semantic search | Thread messages already have recency context; memory search adds most value | Shipped v1.3 |
-| Supabase RPCs over direct queries | Cleaner type filtering at DB level (get_facts, get_active_goals) | Shipped v1.3 |
+| Dedicated heartbeat thread | Keeps proactive messages separate from conversations | ✓ Good — v1.1 |
+| 1h default heartbeat interval | Balance responsiveness vs API cost | ✓ Good — v1.1 |
+| Agent can self-schedule cron | Makes the assistant truly proactive | ✓ Good — v1.1 |
+| croner for cron expressions | 5-field cron + timezone support | ✓ Good — v1.1 |
+| Both Telegram + file config for cron | Phone accessibility + power user editing | ✓ Good — v1.1 |
+| stream-json over json output | Activity detection, progress feedback | ✓ Good — v1.2 |
+| 15-min inactivity timeout | Complex tasks need more time between outputs | ✓ Good — v1.2 |
+| Liveness reporter pattern | Factory + callback decouples typing from callClaude | ✓ Good — v1.2 |
+| Adopt upstream intent names | [REMEMBER:]/[GOAL:]/[DONE:] keeps parity | ✓ Good — v1.3 |
+| OpenAI embeddings via Edge Functions | Keeps API key in Supabase secrets | ✓ Good — v1.3 |
+| Supabase RPCs over direct queries | Cleaner type filtering at DB level | ✓ Good — v1.3 |
+| Compression pyramid (3-layer soul) | Balances personality depth with token efficiency | ✓ Good — v1.4 |
+| Daily evolution without approval | Rafa observes via reports, bot has full autonomy | ✓ Good — v1.4 |
+| 800-token soul budget with truncation | Recent Growth → Active Values → Core Identity priority | ✓ Good — v1.4 |
+| Rollback creates NEW version | Preserves full history, never deletes | ✓ Good — v1.4 |
+| Growth safeguards in evolution prompt | Five principles prevent personality drift | ✓ Good — v1.4 |
+| Warning-only regression validation | Logs regression but doesn't block save | ✓ Good — v1.4 |
 
 ---
 
@@ -114,7 +128,13 @@
 **Delivered:** Typed memory, goals lifecycle, semantic search via Edge Functions
 **Archive:** [Roadmap](milestones/v1.3-ROADMAP.md) | [Requirements](milestones/v1.3-REQUIREMENTS.md)
 
+### Milestone 1.4: Soul Evolution
+**Goal:** Transform static bot soul into self-evolving personality with daily reflection, 3-layer structure, milestone moments, and version history.
+**Status:** Complete (6 phases, shipped 2026-02-16)
+**Delivered:** 3-layer soul architecture, daily evolution engine, milestone moments, soul versioning & rollback, evolution controls, growth safeguards
+**Archive:** [Roadmap](milestones/v1.4-ROADMAP.md) | [Requirements](milestones/v1.4-REQUIREMENTS.md)
+
 </details>
 
 ---
-*Last updated: 2026-02-15 — v1.4 milestone started*
+*Last updated: 2026-02-16 after v1.4 milestone*

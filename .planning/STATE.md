@@ -2,25 +2,23 @@
 
 ## Current Position
 
-Phase: 22 of 22 (Growth Safeguards)
-Plan: 2 of 3
-Status: Phase 22 in progress
-Last activity: 2026-02-16 — Completed 22-02 (Anti-Regression Length Validation)
+Phase: 22 of 22 (all complete)
+Status: v1.4 milestone shipped
+Last activity: 2026-02-16 — v1.4 Soul Evolution archived
 
-Progress: [████████████░░░░░░░░] 67% (33/49 plans complete across all milestones)
+Progress: [████████████████████] 100% (45/45 plans complete across all milestones)
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-15)
+See: .planning/PROJECT.md (updated 2026-02-16)
 
-**Core value:** Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, semantic search, and real-time feedback
-**Current focus:** v1.4 Soul Evolution — self-evolving personality system
+**Core value:** Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, semantic search, real-time feedback, and self-evolving personality
+**Current focus:** Planning next milestone
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 33 (across v1.0-v1.4)
-- Total execution time: 3710s (v1.4 so far)
+- Total plans completed: 45 (across v1.0-v1.4)
 
 **By Milestone:**
 
@@ -30,18 +28,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 | v1.1 Heartbeat | 6-11 | 12/12 | Complete 2026-02-12 |
 | v1.2 Streaming | 12-13 | 4/4 | Complete 2026-02-13 |
 | v1.3 Smart Memory | 14-16 | 7/7 | Complete 2026-02-13 |
-| v1.4 Soul Evolution | 17-22 | 14/20 | In progress |
-
-**v1.4 Phase Breakdown:**
-
-| Phase | Plans | Status |
-|-------|-------|--------|
-| 17. Three-Layer Soul Schema | 2/2 | Complete |
-| 18. Prompt Integration | 2/2 | Complete |
-| 19. Daily Evolution Engine | 2/2 | Complete |
-| 20. Milestone Moments | 2/3 | In progress |
-| 21. Evolution Controls | 2/4 | In progress |
-| 22. Growth Safeguards | 2/3 | In progress |
+| v1.4 Soul Evolution | 17-22 | 12/12 | Complete 2026-02-16 |
 
 ## Accumulated Context
 
@@ -49,58 +36,20 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 
 Decisions are logged in PROJECT.md Key Decisions table.
 
-Recent decisions affecting v1.4:
-- Compression pyramid (3-layer soul): Balances personality depth with token efficiency
-- Daily evolution without approval: Rafa observes via reports, bot has full autonomy
-- Milestone moments: Formative events anchor personality, prevent drift
-- Auto-increment version via COALESCE(MAX(version), -1) + 1 (Phase 17-02): Safe for empty table, avoids race conditions
-- Exclude reflection_notes from history queries (Phase 17-02): Reduces token overhead for evolution context
-- formatSoulForPrompt() graceful fallback chain (Phase 18-01): 3-layer soul_versions → flat bot_soul → hardcoded default
-- Empty soul layers skipped in prompt output (Phase 18-01): Optimizes token usage when active_values/recent_growth not yet populated
-- Word-count * 1.3 token estimation (Phase 18-02): Avoids adding tokenizer dependency, keeps relay lightweight
-- 800-token soul budget with graceful truncation (Phase 18-02): Recent Growth → Active Values → Core Identity priority
-- Default limit=3 for getSoulHistory (Phase 19-01): Only recent context needed for reflection, reduces token overhead
-- Evolution runs at midnight outside active hours (Phase 19-01): User doesn't need to be awake for daily soul evolution
-- 30-min evolution timer interval (Phase 19-01): Balances responsiveness with resource efficiency
-- Evolution reports reuse heartbeat infrastructure (Phase 19-02): Consistent delivery via sendHeartbeatToTelegram() without duplicating routing logic
-- Token budget validation is permissive (Phase 19-02): Logs warning but proceeds, trusting Claude to stay within budget
-- Message truncation strategy (Phase 19-02): Last 100 messages, 200 chars each, balances context richness with token efficiency
-- EVOLUTION_SKIP as graceful no-op (Phase 19-02): Preserves previous soul version when no meaningful interactions occur
-- Event description capped at 300 chars (Phase 20-01): Milestones are richer narratives than REMEMBER facts
-- Default weight is 'meaningful' (Phase 20-01): Balances ease of use with emotional nuance
-- Default limit 10 milestones for evolution (Phase 20-02): Balances rich historical context with token budget
-- Milestone section between Soul History and Today's Interactions (Phase 20-02): Chronological flow from stable past to formative past to immediate present
-- Explicit anti-drift guidance in evolution prompt (Phase 20-02): "Do not discard insights from these moments" prevents personality drift from formative experiences
-- evolution_enabled gates evolutionTick before hour check (Phase 21-01): No need to check time if evolution is globally paused
-- Subcommand parsing preserves backward compatibility (Phase 21-01): /soul <text> still sets personality
-- Silent skip when paused (Phase 21-01): Reduces log noise during paused periods
-- Show 3-layer soul with formatSoulForPrompt() (Phase 21-01): Richer context when checking current soul state
-- Direct query soul_versions for rollback target (Phase 21-02): get_soul_history RPC excludes reflection_notes, we only need the three layers
-- Rollback creates NEW version via save_soul_version (Phase 21-02): Preserves full history, never deletes. Rollback becomes part of evolution timeline
-- History command shows last 10 versions vs default 3 (Phase 21-02): History for user inspection needs more context, evolution still uses limit=3
-- reflection_notes records rollback action (Phase 21-02): Documents "Rollback to vN by user" for audit trail
-- Growth indicator required for all non-skipped evolutions (Phase 22-01): Validates meaningful growth occurred in each evolution cycle
-- Five explicit growth principles prevent personality drift (Phase 22-01): Build/Learn/Preserve/Expand/Name ensure upward trajectory
-- EVOLUTION_SKIP bypasses growth indicator requirement (Phase 22-01): Returns null before validation, no false positives
-- 60% length threshold for regression detection (Phase 22-02): Allows meaningful compression while blocking dramatic content loss
-- Warning-only regression validation (Phase 22-02): Logs regression but doesn't block save, preventing silent evolution failures
-- Prompt reinforcement against regression (Phase 22-02): "Never shorter or simpler" instruction complements structural validation
-- Growth indicator included in regression log metadata (Phase 22-02): Provides context for why length reduction occurred
-
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-None yet.
+None.
 
 ## Session Continuity
 
-**Last session:** 2026-02-16 — Completed 22-02-PLAN.md (Anti-Regression Length Validation)
-**Next action:** Continue Phase 22 (plan 03, if exists) or proceed to next phase
+**Last session:** 2026-02-16 — v1.4 milestone completed and archived
+**Next action:** `/gsd:new-milestone` to start next milestone
 **Resume file:** None
 
 ---
 
-*Updated: 2026-02-16T11:04:53Z*
+*Updated: 2026-02-16*
