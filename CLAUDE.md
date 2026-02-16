@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A relay that bridges Telegram to the Claude Code CLI with threaded conversations, persistent memory, voice I/O, and unrestricted permissions. Messages sent via Telegram are passed to `claude -p --dangerously-skip-permissions`, and responses are sent back. This gives full Claude Code capabilities (tools, MCP servers, file access, shell commands) from a phone.
+A relay that bridges Telegram to the Claude Code CLI with threaded conversations, persistent memory, voice I/O, self-evolving personality, and unrestricted permissions. Messages sent via Telegram are passed to `claude -p --dangerously-skip-permissions`, and responses are sent back. This gives full Claude Code capabilities (tools, MCP servers, file access, shell commands) from a phone.
 
 ```
 Telegram App → Telegram Bot API → Relay (Bun/TypeScript) → claude CLI → Response back
@@ -24,7 +24,12 @@ bun run setup:services # Configure external services (Groq, ElevenLabs)
 ```
 
 **Bot commands (in Telegram):**
-- `/soul <text>` — Set the bot's personality (loaded into every prompt)
+- `/soul <text>` — Set the bot's personality (resets to seed)
+- `/soul pause` — Pause daily soul evolution (freezes current soul)
+- `/soul resume` — Resume daily soul evolution
+- `/soul status` — Show current soul state (3-layer formatted)
+- `/soul history` — Show last 10 soul versions with dates
+- `/soul rollback <version>` — Restore a previous soul version (preserves history)
 - `/new` — Reset the Claude session for the current thread (fresh conversation)
 - `/memory` — Show learned facts and active goals
 - `/cron list` — Show all scheduled cron jobs with status
@@ -38,20 +43,46 @@ bun run setup:services # Configure external services (Groq, ElevenLabs)
 - Active hours: heartbeat only runs during configured window (default 08:00-22:00, timezone-aware)
 - Dedicated thread: heartbeat messages go to a "Heartbeat" forum topic in the group (auto-created)
 
-**Daemon management (macOS LaunchAgent):**
+**Relay process management:**
+
+The relay runs as a macOS LaunchAgent (`com.claude-telegram-relay`). The plist has `KeepAlive: true` and `RunAtLoad: true`, so launchd will auto-restart the process if it crashes and start it on login.
+
 ```bash
-launchctl load ~/Library/LaunchAgents/com.claude-telegram-relay.plist
-launchctl unload ~/Library/LaunchAgents/com.claude-telegram-relay.plist
+# Start the relay (foreground, for development)
+bun run start
+bun run dev                    # with --watch hot-reload
+
+# LaunchAgent — persistent daemon (auto-restarts on crash)
+launchctl load ~/Library/LaunchAgents/com.claude-telegram-relay.plist      # start + enable auto-restart
+launchctl unload ~/Library/LaunchAgents/com.claude-telegram-relay.plist    # stop + disable auto-restart
+
+# Check if the agent is loaded
 launchctl list | grep claude-telegram
+
+# Kill the relay WITHOUT it respawning (must unload first)
+launchctl unload ~/Library/LaunchAgents/com.claude-telegram-relay.plist    # this stops the process AND prevents respawn
+
+# Kill only the current process (launchd will respawn it if loaded)
+pkill -f "bun.*relay.ts"
+
+# Logs
 tail -f ~/.claude-relay/relay.log
 tail -f ~/.claude-relay/relay-error.log
 ```
 
+Key points:
+- `launchctl unload` = stop + prevent respawn. This is the correct way to fully stop the relay.
+- `launchctl load` = start + enable respawn on crash/login.
+- Just killing the process (`pkill`) while the agent is loaded will cause launchd to respawn it within ~10 seconds (`ThrottleInterval: 10`).
+- The relay uses a PID lock file at `~/.claude-relay/bot.lock` to prevent duplicate instances.
+- Plist location: `~/Library/LaunchAgents/com.claude-telegram-relay.plist`
+- Run `bun run setup:launchd` to regenerate the plist with correct paths.
+
 ## Architecture
 
-**Single file core** — `src/relay.ts` is the entire relay.
+**Single file core** — `src/relay.ts` (~3,800 lines) is the entire relay.
 
-**Message flow**: Every message goes through `buildPrompt()` → `callClaude()` → `processIntents()` → response sent back. The prompt includes four memory layers and instructions for intent tags.
+**Message flow**: Every message goes through `buildPrompt()` → `callClaude()` → `processIntents()` → response sent back. The prompt includes four memory layers, 3-layer soul personality, and instructions for intent tags.
 
 **Threading model:**
 - Bot works in Telegram DMs (single conversation) and supergroups with Topics (one conversation per topic)
@@ -60,7 +91,7 @@ tail -f ~/.claude-relay/relay-error.log
 - Groups without Topics are treated as a single conversation
 
 **Four-layer memory system** (assembled in `buildPrompt()`):
-1. **Soul** — Bot personality from `bot_soul` table, loaded at the top of every prompt
+1. **Soul** — 3-layer evolving personality from `soul_versions` table (Core Identity + Active Values + Recent Growth), capped at 800 tokens. Falls back to `bot_soul` table then hardcoded default. Formatted via `formatSoulForPrompt()`.
 2. **Global memory** — Cross-thread typed entries from `global_memory` table (facts via `[REMEMBER:]`, goals via `[GOAL:]`/`[DONE:]`)
 3. **Semantic memory** — Relevant memories fetched via `getRelevantMemory()` → Supabase Edge Function → OpenAI embeddings → `match_memory()` RPC. Deduplicated against facts/goals. Graceful fallback (empty) when Edge Functions unavailable.
 4. **Thread context** — Per-thread summary + recent 5 messages from Supabase
@@ -68,6 +99,14 @@ tail -f ~/.claude-relay/relay-error.log
 **Supabase Edge Functions** (`supabase/functions/`):
 - `embed/index.ts` — Auto-embeds `global_memory` rows on INSERT via database webhook. Uses OpenAI text-embedding-3-small. OPENAI_API_KEY in Supabase secrets only.
 - `search/index.ts` — Semantic search: embeds query, calls `match_memory()` RPC, returns ranked results. Always returns `{ results: [] }` on errors.
+
+**Soul Evolution System:**
+- **3-layer compression pyramid** — Core Identity (stable personality), Active Values (current focus areas), Recent Growth (latest insights). Each layer gets more volatile top-to-bottom.
+- **Daily evolution** — `evolutionTick()` fires every 30 min, checks if midnight has passed and `evolution_enabled` is true. `performDailyEvolution()` gathers last 24h messages, soul history (3 versions), and milestone moments (10 max), builds a reflection prompt, calls Claude, parses the 3-layer response + growth indicator.
+- **Milestone moments** — `[MILESTONE:]` intent detects formative events during conversations. Stored in `soul_milestones` with emotional weight (formative/meaningful/challenging) and lesson learned. Consulted during daily evolution to anchor personality.
+- **Growth safeguards** — Evolution prompt includes 5 growth principles (Build/Learn/Preserve/Expand/Name). Anti-regression validation checks new soul isn't <60% of previous length. Warning-only (doesn't block save).
+- **Version history** — Every evolution creates a new version via `save_soul_version` RPC. Rollback creates a NEW version (never deletes). Full audit trail in `reflection_notes`.
+- **Evolution reports** — Delivered to Telegram via `sendHeartbeatToTelegram()` (reuses heartbeat infrastructure). Includes growth indicator and token count.
 
 **Key sections in relay.ts:**
 
@@ -81,7 +120,10 @@ tail -f ~/.claude-relay/relay-error.log
   - `[FORGET: search text]` → deletes matching fact from `global_memory`
   - `[VOICE_REPLY]` → triggers ElevenLabs TTS for the response
   - `[CRON: schedule | prompt]` → creates a scheduled cron job with source='agent'
-- **Heartbeat & cron events** — Logged to `logs_v2` with event types: `heartbeat_tick`, `heartbeat_ok`, `heartbeat_delivered`, `heartbeat_dedup`, `heartbeat_skip`, `heartbeat_error`, `cron_created`, `cron_deleted`, `cron_executed`, `cron_delivered`, `cron_error`, `bot_stopping`
+  - `[MILESTONE: description | WEIGHT: formative/meaningful/challenging | LESSON: text]` → stores formative moment in `soul_milestones`
+- **Soul evolution layer** — `getCurrentSoul()`, `formatSoulForPrompt()`, `getSoulHistory()`, `saveMilestone()`, `getMilestones()`, `getLast24hMessages()`, `buildEvolutionPrompt()`, `parseEvolutionResponse()`, `performDailyEvolution()`, `evolutionTick()`, `startEvolutionTimer()`, `stopEvolutionTimer()`
+- **Soul control commands** — `/soul` handler with subcommands: `pause`, `resume`, `status`, `history`, `rollback <N>`, and fallback `<text>` for setting soul seed
+- **Heartbeat & cron events** — Logged to `logs_v2` with event types: `heartbeat_tick`, `heartbeat_ok`, `heartbeat_delivered`, `heartbeat_dedup`, `heartbeat_skip`, `heartbeat_error`, `cron_created`, `cron_deleted`, `cron_executed`, `cron_delivered`, `cron_error`, `evolution_started`, `evolution_completed`, `evolution_skipped`, `evolution_error`, `evolution_regression_warning`, `bot_stopping`
 - **Thread routing middleware** — Extracts `message_thread_id`, creates/finds thread in Supabase, attaches `threadInfo` to context
 - **callClaude()** — Spawns `claude -p "<prompt>" --resume <sessionId> --output-format stream-json --verbose --dangerously-skip-permissions`. Parses NDJSON events line-by-line: session ID from `system/init`, result text from `result` event. Resets inactivity timer on every stream event. Optional `onStreamEvent` callback fires for each parsed event (used by liveness reporter). Auto-retries without `--resume` if session is expired/corrupt. 15-minute inactivity timeout.
 - **Liveness reporter** — `createLivenessReporter()` provides continuous typing indicators (every 4s) and throttled progress messages (tool names every 15s) during Claude work. Used by all 4 message handlers. Status message is edited in-place and deleted on completion.
@@ -127,16 +169,21 @@ Tables used by the relay:
 - `threads` — Conversation channels (telegram IDs, claude session, summary, message count)
 - `thread_messages` — Per-thread message history (role, content)
 - `global_memory` — Cross-thread typed entries (type: fact/goal/completed_goal/preference, content, embedding, deadline, priority)
-- `bot_soul` — Personality definitions (content, is_active)
+- `bot_soul` — Personality definitions (content, is_active) — legacy, used as fallback
+- `soul_versions` — Versioned 3-layer soul snapshots (version, core_identity, active_values, recent_growth, reflection_notes, token_count)
+- `soul_milestones` — Formative moments (description, weight: formative/meaningful/challenging, lesson_learned)
 - `logs_v2` — Observability events (event, message, metadata, thread_id)
 - `cron_jobs` — Scheduled jobs (name, schedule, prompt, target thread, source: user/agent/file)
-- `heartbeat_config` — Single-row heartbeat settings (interval, active hours, timezone, enabled)
+- `heartbeat_config` — Single-row heartbeat settings (interval, active hours, timezone, enabled, evolution_enabled)
 
 Migrations:
 - `supabase/migrations/20260210202924_schema_v2_threads_memory_soul.sql` (v2: threads, memory, soul)
 - `supabase/migrations/20260212100000_heartbeat_cron_schema.sql` (v2.1: heartbeat config, cron jobs)
 - `supabase/migrations/20260212100001_add_file_source.sql` (v2.2: add 'file' source for cron jobs)
 - `supabase/migrations/20260213100000_typed_memory_schema.sql` (v2.3: typed memory, vector embeddings, RPCs)
+- `supabase/migrations/20260215100000_soul_versions_milestones.sql` (v2.4: soul_versions, soul_milestones tables)
+- `supabase/migrations/20260215100001_soul_rpcs.sql` (v2.5: soul RPCs — get_current_soul, save_soul_version, get_soul_history, save_milestone_moment, get_milestone_moments)
+- `supabase/migrations/20260216100000_evolution_enabled.sql` (v2.6: evolution_enabled column on heartbeat_config)
 
 Reference SQL: `examples/supabase-schema-v2.sql`
 
