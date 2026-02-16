@@ -186,12 +186,11 @@ Plans:
   2. [MILESTONE:] intent allows explicit tagging with emotional weight and lesson
   3. Milestone moments stored with weight classification (formative/meaningful/challenging)
   4. Daily evolution consults milestone moments for personality anchoring
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 20-01: Add [MILESTONE:] intent parsing to processIntents()
-- [ ] 20-02: Update daily reflection prompt to include milestone moments
-- [ ] 20-03: Test milestone consultation during evolution
+- [ ] 20-01-PLAN.md — Add [MILESTONE:] intent parsing, saveMilestone helper, and system prompt instructions
+- [ ] 20-02-PLAN.md — Integrate milestone moments into daily evolution reflection prompt
 
 ### Phase 21: Evolution Controls
 **Goal**: User can manage soul evolution lifecycle via Telegram commands
@@ -253,7 +252,7 @@ Phases execute in numeric order: 17 → 18 → 19 → 20 → 21 → 22
 | 17. Three-Layer Soul Schema | v1.4 | Complete    | 2026-02-15 | - |
 | 18. Prompt Integration | v1.4 | Complete    | 2026-02-16 | - |
 | 19. Daily Evolution Engine | v1.4 | Complete    | 2026-02-16 | - |
-| 20. Milestone Moments | v1.4 | 0/3 | Not started | - |
+| 20. Milestone Moments | v1.4 | 0/2 | Not started | - |
 | 21. Evolution Controls | v1.4 | 0/4 | Not started | - |
 | 22. Growth Safeguards | v1.4 | 0/3 | Not started | - |
 
