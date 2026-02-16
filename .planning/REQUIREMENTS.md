@@ -53,25 +53,30 @@ None — this is a focused security patch.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EDGE-01 | — | Pending |
-| EDGE-02 | — | Pending |
-| EDGE-03 | — | Pending |
-| EDGE-04 | — | Pending |
-| INTENT-01 | — | Pending |
-| INTENT-02 | — | Pending |
-| INTENT-03 | — | Pending |
-| VALID-01 | — | Pending |
-| VALID-02 | — | Pending |
-| INPUT-01 | — | Pending |
-| INPUT-02 | — | Pending |
-| INPUT-03 | — | Pending |
-| PROC-01 | — | Pending |
+| EDGE-01 | Phase 23 | Pending |
+| EDGE-02 | Phase 23 | Pending |
+| EDGE-03 | Phase 23 | Pending |
+| EDGE-04 | Phase 23 | Pending |
+| INTENT-01 | Phase 24 | Pending |
+| INTENT-02 | Phase 24 | Pending |
+| INTENT-03 | Phase 24 | Pending |
+| VALID-01 | Phase 25 | Pending |
+| VALID-02 | Phase 25 | Pending |
+| INPUT-01 | Phase 25 | Pending |
+| INPUT-02 | Phase 25 | Pending |
+| INPUT-03 | Phase 25 | Pending |
+| PROC-01 | Phase 25 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13 (pending roadmap)
+- Mapped to phases: 13
+- Unmapped: 0
+
+**Phase mapping:**
+- Phase 23 (Edge Function Security): 4 requirements
+- Phase 24 (Intent Injection Defense): 3 requirements
+- Phase 25 (Intent Validation + Input Hardening): 6 requirements
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-16 after initial definition*
+*Last updated: 2026-02-16 after roadmap creation*
