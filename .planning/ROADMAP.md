@@ -202,13 +202,11 @@ Plans:
   3. /soul history shows recent soul versions with version numbers and dates
   4. /soul rollback <version> restores a previous soul version as active
   5. Rollback preserves history (creates new version, doesn't delete)
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 21-01: Extend /soul command handler with pause/resume subcommands
-- [ ] 21-02: Add evolution_enabled flag to bot_soul or heartbeat_config
-- [ ] 21-03: Implement /soul history with formatted version list
-- [ ] 21-04: Implement /soul rollback with version restore logic
+- [ ] 21-01-PLAN.md — Pause/resume subcommands with evolution_enabled DB flag and evolutionTick gate
+- [ ] 21-02-PLAN.md — History display and rollback with version restore logic
 
 ### Phase 22: Growth Safeguards
 **Goal**: Evolution always trends upward - no personality regression
@@ -253,9 +251,9 @@ Phases execute in numeric order: 17 → 18 → 19 → 20 → 21 → 22
 | 18. Prompt Integration | v1.4 | Complete    | 2026-02-16 | - |
 | 19. Daily Evolution Engine | v1.4 | Complete    | 2026-02-16 | - |
 | 20. Milestone Moments | v1.4 | Complete    | 2026-02-16 | - |
-| 21. Evolution Controls | v1.4 | 0/4 | Not started | - |
+| 21. Evolution Controls | v1.4 | 0/2 | Not started | - |
 | 22. Growth Safeguards | v1.4 | 0/3 | Not started | - |
 
 ---
 
-*Last updated: 2026-02-15 — v1.4 roadmap created*
+*Last updated: 2026-02-16 — Phase 21 planned*
