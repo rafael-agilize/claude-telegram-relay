@@ -1476,6 +1476,85 @@ let lastEvolutionDate: string | null = null; // Daily dedup: "2026-02-15"
 const EVOLUTION_HOUR = parseInt(process.env.EVOLUTION_HOUR || "0"); // 0 = midnight
 const EVOLUTION_TIMEZONE = process.env.EVOLUTION_TIMEZONE || "America/Sao_Paulo";
 
+async function performDailyEvolution(): Promise<void> {
+  // Get last 24h messages
+  const messages = await getLast24hMessages();
+  if (messages.length === 0) {
+    console.log("Evolution: no interactions in last 24h, skipping");
+    await logEventV2("evolution_skip", "No interactions in last 24h");
+    return;
+  }
+
+  console.log(`Evolution: processing ${messages.length} messages from last 24h`);
+
+  // Get current soul and history
+  const currentSoul = await getCurrentSoul();
+  const soulHistory = await getSoulHistory(3);
+
+  // Build prompt
+  const prompt = buildEvolutionPrompt(currentSoul, soulHistory, messages);
+
+  // Call Claude (standalone, no --resume)
+  console.log("Evolution: calling Claude for reflection...");
+  const { text } = await callClaude(prompt);
+
+  // Parse response
+  const parsed = parseEvolutionResponse(text);
+  if (!parsed) {
+    console.log("Evolution: Claude returned EVOLUTION_SKIP or parsing failed");
+    await logEventV2("evolution_skip", "Claude returned EVOLUTION_SKIP or parsing failed");
+    return;
+  }
+
+  // Validate token budget
+  const combinedSoulText = parsed.coreIdentity + parsed.activeValues + parsed.recentGrowth;
+  const tokenEstimate = estimateTokens(combinedSoulText);
+  if (tokenEstimate > SOUL_TOKEN_BUDGET) {
+    console.warn(`Evolution: token estimate ${tokenEstimate} exceeds budget ${SOUL_TOKEN_BUDGET}`);
+  }
+
+  // Save new version via RPC
+  if (!supabase) {
+    console.error("Evolution: cannot save — Supabase not available");
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase.rpc("save_soul_version", {
+      p_core_identity: parsed.coreIdentity,
+      p_active_values: parsed.activeValues,
+      p_recent_growth: parsed.recentGrowth,
+      p_reflection_notes: text,
+      p_token_count: tokenEstimate,
+    });
+
+    if (error) {
+      console.error("Evolution: save_soul_version RPC error:", error);
+      await logEventV2("evolution_error", `save_soul_version failed: ${error.message}`);
+      return;
+    }
+
+    const newVersion = data as number;
+    console.log(`Evolution: saved new soul version ${newVersion} (${tokenEstimate} tokens)`);
+
+    // Log success event
+    await logEventV2("evolution_complete", "Daily soul evolution completed", {
+      version: newVersion,
+      token_count: tokenEstimate,
+      message_count: messages.length,
+    });
+
+    // Deliver evolution report to Telegram
+    const reportMessage = `🌱 **Daily Soul Evolution (v${newVersion})**\n\n${parsed.report}\n\n_Token count: ${tokenEstimate} / ${SOUL_TOKEN_BUDGET}_`;
+    await sendHeartbeatToTelegram(reportMessage);
+
+    console.log("Evolution: report delivered to Telegram");
+  } catch (e) {
+    console.error("Evolution: error during save/notify:", e);
+    await logEventV2("evolution_error", String(e).substring(0, 200));
+  }
+}
+
 async function evolutionTick(): Promise<void> {
   // Guard against overlapping runs
   if (evolutionRunning) {
@@ -1522,8 +1601,13 @@ async function evolutionTick(): Promise<void> {
     // Update last run date
     lastEvolutionDate = todayDate;
 
-    // TODO (Plan 02): Call evolution reflection logic here
-    console.log("Evolution: tick triggered, ready for reflection (logic in Plan 02)");
+    // Perform daily evolution
+    try {
+      await performDailyEvolution();
+    } catch (e) {
+      console.error("Evolution error:", e);
+      await logEventV2("evolution_error", String(e).substring(0, 200));
+    }
   } catch (e) {
     console.error("Evolution tick error:", e);
     await logEventV2("evolution_error", String(e).substring(0, 200));
