@@ -426,6 +426,31 @@ async function deleteMemory(searchText: string): Promise<boolean> {
   }
 }
 
+async function saveMilestone(
+  eventDescription: string,
+  emotionalWeight: string = "meaningful",
+  lessonLearned: string = "",
+  threadDbId?: string
+): Promise<boolean> {
+  if (!supabase) return false;
+  try {
+    const { error } = await supabase.rpc("save_milestone_moment", {
+      p_event_description: eventDescription,
+      p_emotional_weight: emotionalWeight,
+      p_lesson_learned: lessonLearned,
+      p_source_thread_id: threadDbId || null,
+    });
+    if (error) {
+      console.error("saveMilestone RPC error:", error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("saveMilestone error:", e);
+    return false;
+  }
+}
+
 async function getActiveGoals(): Promise<
   Array<{ content: string; deadline: string | null; priority: number }>
 > {
@@ -1957,7 +1982,7 @@ async function processIntents(response: string, threadDbId?: string): Promise<st
   const failures: string[] = [];
 
   // Log if any intent tags are detected at all
-  const hasIntents = /\[(REMEMBER|FORGET|GOAL|DONE|CRON|VOICE_REPLY)[:\]]/i.test(response);
+  const hasIntents = /\[(REMEMBER|FORGET|GOAL|DONE|CRON|VOICE_REPLY|MILESTONE)[:\]]/i.test(response);
   if (hasIntents) {
     console.log(`[Intents] Detected intent tags in response (${response.length} chars)`);
   }
@@ -2061,6 +2086,33 @@ async function processIntents(response: string, threadDbId?: string): Promise<st
       }
     } else {
       console.warn(`[Agent] Rejected CRON intent: schedule="${schedule}" prompt length=${prompt.length}`);
+    }
+    clean = clean.replace(match[0], "");
+  }
+
+  // [MILESTONE: event | WEIGHT: weight | LESSON: lesson] — formative moment tagging
+  const milestoneMatches = response.matchAll(
+    /\[MILESTONE:\s*(.+?)(?:\s*\|\s*WEIGHT:\s*(formative|meaningful|challenging))?(?:\s*\|\s*LESSON:\s*(.+?))?\]/gi
+  );
+  for (const match of milestoneMatches) {
+    const eventDesc = match[1].trim();
+    const weight = match[2]?.trim().toLowerCase() || "meaningful";
+    const lesson = match[3]?.trim() || "";
+    if (eventDesc.length > 0 && eventDesc.length <= 300) {
+      const ok = await saveMilestone(eventDesc, weight, lesson, threadDbId);
+      if (ok) {
+        console.log(`Milestone saved: [${weight}] ${eventDesc}`);
+        await logEventV2("milestone_saved", `Milestone: ${eventDesc}`, {
+          emotional_weight: weight,
+          lesson_learned: lesson.substring(0, 100),
+        }, threadDbId);
+      } else {
+        console.warn(`[Intents] MILESTONE failed to save: ${eventDesc}`);
+        failures.push(`Failed to save milestone: "${eventDesc.substring(0, 50)}..."`);
+      }
+    } else if (eventDesc.length > 300) {
+      console.warn(`Rejected MILESTONE: too long (${eventDesc.length} chars)`);
+      failures.push(`Rejected milestone (too long): "${eventDesc.substring(0, 50)}..."`);
     }
     clean = clean.replace(match[0], "");
   }
