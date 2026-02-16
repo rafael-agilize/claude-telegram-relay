@@ -2,18 +2,17 @@
 
 ## Current Position
 
-Phase: 22 of 22 (all complete)
-Status: v1.4 milestone shipped
-Last activity: 2026-02-16 — v1.4 Soul Evolution archived
-
-Progress: [████████████████████] 100% (45/45 plans complete across all milestones)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-16 — Milestone v1.5 started
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, semantic search, real-time feedback, and self-evolving personality
-**Current focus:** Planning next milestone
+**Current focus:** v1.5 Security Hardening — fix all 13 audit findings
 
 ## Performance Metrics
 
@@ -29,6 +28,7 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 | v1.2 Streaming | 12-13 | 4/4 | Complete 2026-02-13 |
 | v1.3 Smart Memory | 14-16 | 7/7 | Complete 2026-02-13 |
 | v1.4 Soul Evolution | 17-22 | 12/12 | Complete 2026-02-16 |
+| v1.5 Security Hardening | — | — | In Progress |
 
 ## Accumulated Context
 
@@ -46,8 +46,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-02-16 — v1.4 milestone completed and archived
-**Next action:** `/gsd:new-milestone` to start next milestone
+**Last session:** 2026-02-16 — v1.5 Security Hardening milestone started
+**Next action:** Define requirements, then roadmap
 **Resume file:** None
 
 ---

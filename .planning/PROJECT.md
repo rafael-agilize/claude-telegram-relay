@@ -8,10 +8,16 @@
 
 **Architecture:** Single-file relay (`src/relay.ts` ~3,800 lines) + 2 Supabase Edge Functions. Message flow: Telegram -> Grammy handler -> buildPrompt() -> callClaude() via Bun.spawn -> processIntents() -> response back to Telegram.
 
-## Current State
+## Current Milestone: v1.5 Security Hardening
 
-**Latest version:** v1.4 (shipped 2026-02-16)
-**Status:** All milestones complete. Ready for next milestone planning.
+**Goal:** Fix all 13 security vulnerabilities from full audit (4 HIGH, 9 MEDIUM) without breaking existing capabilities.
+
+**Target features:**
+- Edge Function authentication and input validation (vulns 1, 2, 8, 9)
+- Context-aware intent allowlisting to prevent prompt injection escalation (vulns 3, 4, 7)
+- Intent system hardening — FORGET matching, per-response caps, confirmation flow (vulns 5, 6)
+- Relay input validation — /soul length cap, memory entry limits, filename allowlist (vulns 10, 11, 12)
+- Lock file race condition fix (vuln 13)
 
 ## Core Value
 
@@ -42,7 +48,18 @@ Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactiv
 
 ### Active
 
-(None — ready for next milestone requirements)
+- [ ] Edge Function caller authentication (service_role JWT verification)
+- [ ] Embed function fetches content from DB instead of trusting client
+- [ ] Context-aware intent allowlisting (disable CRON/FORGET in heartbeat/cron contexts)
+- [ ] User confirmation for agent-created cron jobs
+- [ ] FORGET matching threshold (min length + overlap)
+- [ ] Per-response intent count caps with deduplication
+- [ ] Search function input bounds (match_count, match_threshold)
+- [ ] Generic error responses in Edge Functions
+- [ ] /soul content length cap
+- [ ] Memory entry count cap with eviction
+- [ ] Filename sanitization allowlist
+- [ ] Lock file atomic acquisition (no fallback overwrite)
 
 ### Out of Scope
 
@@ -137,4 +154,4 @@ Soul evolution system transforms static bot personality into a living, growing i
 </details>
 
 ---
-*Last updated: 2026-02-16 after v1.4 milestone*
+*Last updated: 2026-02-16 after v1.5 milestone started*
