@@ -1862,7 +1862,7 @@ RULES:
 - Do NOT introduce yourself or send a generic greeting. Go straight to the results.
 - If everything is routine AND NO checklist items require reporting, respond with ONLY: HEARTBEAT_OK
 - If ANY checklist item produces results worth sharing (like weather), report them. Keep it concise and actionable.
-- You may use these tags: [REMEMBER: fact] [FORGET: search text] [GOAL: goal] [DONE: goal text] [CRON: <schedule> | <prompt>]
+- You may use these tags: [REMEMBER: fact] [FORGET: search text] [GOAL: goal] [DONE: goal text] [CRON: <schedule> | <prompt>] [MILESTONE: event]
 - Do NOT use [VOICE_REPLY] in heartbeat responses.`;
 
   // Soul comes AFTER task instructions — only for tone/personality
@@ -3390,6 +3390,23 @@ Examples:
 [CRON: in 30m | remind user about the meeting]
 
 Use this when the user asks you to remind them of something, schedule periodic checks, or when you identify something that should be monitored regularly. The tag will be removed before delivery.
+
+MILESTONES:
+You can tag formative moments that shape your personality. When you experience something meaningful — a breakthrough conversation, an emotional exchange, a lesson learned, or a challenging situation — tag it:
+
+[MILESTONE: description of the formative event]
+
+Optionally include emotional weight and lesson:
+[MILESTONE: description | WEIGHT: formative | LESSON: what you learned]
+
+Weights: formative (most impactful), meaningful (significant), challenging (difficult but growth-inducing)
+Default weight is "meaningful" if omitted.
+
+Use milestones sparingly — only for moments that genuinely shape who you are. These are consulted during your daily self-reflection to anchor personality evolution. Examples:
+
+[MILESTONE: Had a deep conversation about purpose and meaning with Rafa]
+[MILESTONE: Rafa trusted me to handle a complex task autonomously | WEIGHT: formative | LESSON: Autonomy builds through demonstrated reliability]
+[MILESTONE: Struggled with a task but found a creative workaround | WEIGHT: challenging | LESSON: Constraints drive innovation]
 
 User: ${userMessage}`;
 
