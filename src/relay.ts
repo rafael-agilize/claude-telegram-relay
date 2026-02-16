@@ -602,6 +602,66 @@ async function setSoul(content: string): Promise<boolean> {
   }
 }
 
+async function getLast24hMessages(): Promise<Array<{ role: string; content: string; thread_name: string; created_at: string }>> {
+  if (!supabase) return [];
+  try {
+    // Calculate cutoff time: 24 hours ago
+    const cutoffISO = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    // Step 1: Fetch all threads to build thread_id -> thread_name mapping
+    const { data: threads, error: threadsError } = await supabase
+      .from("threads")
+      .select("id, title");
+
+    if (threadsError) {
+      console.error("getLast24hMessages: threads query error:", threadsError);
+      return [];
+    }
+
+    const threadMap = new Map<string, string>();
+    threads?.forEach(t => threadMap.set(t.id, t.title || "Unknown"));
+
+    // Step 2: Fetch messages from last 24h across all threads
+    const { data: messages, error: messagesError } = await supabase
+      .from("thread_messages")
+      .select("role, content, created_at, thread_id")
+      .gte("created_at", cutoffISO)
+      .order("created_at", { ascending: true })
+      .limit(200);
+
+    if (messagesError) {
+      console.error("getLast24hMessages: messages query error:", messagesError);
+      return [];
+    }
+
+    // Step 3: Map thread_id to thread_name
+    return (messages || []).map(msg => ({
+      role: msg.role,
+      content: msg.content,
+      thread_name: threadMap.get(msg.thread_id) || "Unknown",
+      created_at: msg.created_at,
+    }));
+  } catch (e) {
+    console.error("getLast24hMessages error:", e);
+    return [];
+  }
+}
+
+async function getSoulHistory(limit: number = 3): Promise<SoulVersion[]> {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase.rpc("get_soul_history", { p_limit: limit });
+    if (error) {
+      console.error("getSoulHistory error:", error);
+      return [];
+    }
+    return (data || []) as SoulVersion[];
+  } catch (e) {
+    console.error("getSoulHistory error:", e);
+    return [];
+  }
+}
+
 async function clearThreadSession(threadDbId: string): Promise<boolean> {
   if (!supabase) return false;
   try {
