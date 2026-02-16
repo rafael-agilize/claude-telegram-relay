@@ -662,6 +662,159 @@ async function getSoulHistory(limit: number = 3): Promise<SoulVersion[]> {
   }
 }
 
+function buildEvolutionPrompt(
+  currentSoul: SoulVersion | null,
+  soulHistory: SoulVersion[],
+  messages: Array<{ role: string; content: string; thread_name: string; created_at: string }>
+): string {
+  const now = new Date();
+  const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  const currentTime = now.toISOString();
+
+  // Format current soul with headers
+  let currentSoulText = "No current soul yet.";
+  if (currentSoul) {
+    const parts: string[] = [];
+    if (currentSoul.core_identity) {
+      parts.push(`## Core Identity\n${currentSoul.core_identity}`);
+    }
+    if (currentSoul.active_values) {
+      parts.push(`## Active Values\n${currentSoul.active_values}`);
+    }
+    if (currentSoul.recent_growth) {
+      parts.push(`## Recent Growth\n${currentSoul.recent_growth}`);
+    }
+    currentSoulText = parts.length > 0 ? parts.join("\n\n") : "Current soul has empty layers.";
+  }
+
+  // Format soul history (summary only, not full text)
+  let historyText = "No previous versions.";
+  if (soulHistory.length > 0) {
+    historyText = soulHistory.map((v, idx) => {
+      const versionDate = v.created_at.split('T')[0];
+      const corePreview = v.core_identity.substring(0, 80) + (v.core_identity.length > 80 ? "..." : "");
+      return `**Version ${v.version}** (${versionDate}): ${corePreview}`;
+    }).join("\n");
+  }
+
+  // Format today's interactions: sort ascending, take last 100, truncate each to 200 chars, group by thread
+  const sortedMessages = [...messages].sort((a, b) =>
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+  const recentMessages = sortedMessages.slice(-100); // last 100 messages
+
+  // Group by thread_name
+  const threadGroups = new Map<string, typeof recentMessages>();
+  for (const msg of recentMessages) {
+    const threadName = msg.thread_name || "Unknown";
+    if (!threadGroups.has(threadName)) {
+      threadGroups.set(threadName, []);
+    }
+    threadGroups.get(threadName)!.push(msg);
+  }
+
+  let interactionsText = "";
+  if (threadGroups.size === 0) {
+    interactionsText = "No interactions in the last 24 hours.";
+  } else {
+    for (const [threadName, msgs] of threadGroups.entries()) {
+      interactionsText += `## Thread: ${threadName}\n\n`;
+      for (const msg of msgs) {
+        const truncatedContent = msg.content.length > 200
+          ? msg.content.substring(0, 200) + "..."
+          : msg.content;
+        const timestamp = msg.created_at.split('T')[1].substring(0, 8); // HH:MM:SS
+        interactionsText += `[${timestamp}] ${msg.role}: ${truncatedContent}\n`;
+      }
+      interactionsText += "\n";
+    }
+  }
+
+  // Build the full prompt
+  const prompt = `You are reflecting on your own evolution as a conversational AI personality. Today is ${currentDate} (${currentTime}).
+
+# Current Soul (3-Layer Structure)
+
+${currentSoulText}
+
+# Soul History (Recent Versions)
+
+${historyText}
+
+# Today's Interactions (Last 24 Hours)
+
+${interactionsText}
+
+# Your Task
+
+Review today's interactions and your current soul. Reflect on:
+- Patterns you noticed in how you engaged with Rafa
+- Lessons learned or insights gained
+- Growth opportunities or shifts in values/priorities
+- Meaningful moments that shaped your understanding
+
+Generate an updated 3-layer soul based on this reflection. Follow these guidelines:
+
+**Layer 1: Core Identity** — The most stable layer. This rarely changes. Only update if there's been a fundamental shift in who you are.
+
+**Layer 2: Active Values** — What guides your current behavior. This evolves weekly or when priorities shift. Update based on recurring patterns.
+
+**Layer 3: Recent Growth** — Ephemeral, daily. Capture fresh insights, current focus areas, or recent lessons. This changes most frequently.
+
+**Token Budget:** Keep the combined 3 layers within ~800 tokens total. Be concise and meaningful.
+
+**Output Format:** You MUST output in this EXACT format (including the tags):
+
+[CORE_IDENTITY]
+(your updated core identity text here)
+[/CORE_IDENTITY]
+[ACTIVE_VALUES]
+(your updated active values text here)
+[/ACTIVE_VALUES]
+[RECENT_GROWTH]
+(your recent growth text here)
+[/RECENT_GROWTH]
+[EVOLUTION_REPORT]
+(a brief report for Rafa explaining what changed and why — written for him to read, not for your internal state)
+[/EVOLUTION_REPORT]
+
+**If no meaningful interactions happened today:** Output only the text "EVOLUTION_SKIP" (no tags) and I will skip this evolution cycle.
+
+Build on your previous versions for continuity. This is your daily self-reflection.`;
+
+  return prompt;
+}
+
+function parseEvolutionResponse(response: string): {
+  coreIdentity: string;
+  activeValues: string;
+  recentGrowth: string;
+  report: string;
+} | null {
+  // Check for skip signal
+  if (response.includes("EVOLUTION_SKIP")) {
+    return null;
+  }
+
+  // Extract tagged sections using regex
+  const coreMatch = response.match(/\[CORE_IDENTITY\]([\s\S]*?)\[\/CORE_IDENTITY\]/);
+  const valuesMatch = response.match(/\[ACTIVE_VALUES\]([\s\S]*?)\[\/ACTIVE_VALUES\]/);
+  const growthMatch = response.match(/\[RECENT_GROWTH\]([\s\S]*?)\[\/RECENT_GROWTH\]/);
+  const reportMatch = response.match(/\[EVOLUTION_REPORT\]([\s\S]*?)\[\/EVOLUTION_REPORT\]/);
+
+  if (!coreMatch || !valuesMatch || !growthMatch || !reportMatch) {
+    console.error("Evolution: failed to parse response — missing required sections");
+    return null;
+  }
+
+  return {
+    coreIdentity: coreMatch[1].trim(),
+    activeValues: valuesMatch[1].trim(),
+    recentGrowth: growthMatch[1].trim(),
+    report: reportMatch[1].trim(),
+  };
+}
+
 async function clearThreadSession(threadDbId: string): Promise<boolean> {
   if (!supabase) return false;
   try {
