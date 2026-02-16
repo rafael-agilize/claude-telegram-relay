@@ -217,12 +217,11 @@ Plans:
   2. Daily evolution builds on previous versions, never regresses
   3. Bot learns from challenges without adopting negative patterns
   4. Soul evolution report includes growth indicator (what improved today)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 22-01: Craft reflection prompt with growth constraints
-- [ ] 22-02: Add growth indicator extraction to evolution report
-- [ ] 22-03: Test evolution across multiple days for upward trajectory
+- [ ] 22-01-PLAN.md — Growth safeguard instructions in reflection prompt + growth indicator tag parsing
+- [ ] 22-02-PLAN.md — Anti-regression length validation + continuity prompt reinforcement
 
 ## Progress
 
@@ -252,7 +251,7 @@ Phases execute in numeric order: 17 → 18 → 19 → 20 → 21 → 22
 | 19. Daily Evolution Engine | v1.4 | Complete    | 2026-02-16 | - |
 | 20. Milestone Moments | v1.4 | Complete    | 2026-02-16 | - |
 | 21. Evolution Controls | v1.4 | Complete    | 2026-02-16 | - |
-| 22. Growth Safeguards | v1.4 | 0/3 | Not started | - |
+| 22. Growth Safeguards | v1.4 | 0/2 | Not started | - |
 
 ---
 
