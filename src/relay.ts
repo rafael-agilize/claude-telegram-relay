@@ -939,7 +939,7 @@ async function executeCronJob(job: CronJob): Promise<void> {
   const threadInfo = await getThreadInfoForCronJob(job);
 
   // Build prompt
-  const soul = await getActiveSoul();
+  const soul = await formatSoulForPrompt();
   const memoryFacts = await getMemoryContext();
   const activeGoals = await getActiveGoals();
 
@@ -1405,7 +1405,7 @@ async function buildHeartbeatPrompt(checklist: string): Promise<string> {
     minute: "2-digit",
   });
 
-  const soul = await getActiveSoul();
+  const soul = await formatSoulForPrompt();
   const memoryFacts = await getMemoryContext();
   const activeGoals = await getActiveGoals();
 
@@ -2807,7 +2807,7 @@ async function buildPrompt(userMessage: string, threadInfo?: ThreadInfo): Promis
   });
 
   // Layer 1: Soul (personality)
-  const soul = await getActiveSoul();
+  const soul = await formatSoulForPrompt();
 
   // Layer 2: Memory context (facts + active goals)
   const memoryFacts = await getMemoryContext();
