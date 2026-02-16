@@ -154,12 +154,11 @@ Plans:
   2. Active soul text never exceeds 800 tokens (validation at prompt assembly time)
   3. Full soul history and milestones stay in database, never loaded into prompt
   4. Bot responses reflect personality defined in 3-layer soul
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 18-01: Refactor buildPrompt() to fetch and format 3-layer soul
-- [ ] 18-02: Add token counting validation before prompt assembly
-- [ ] 18-03: Test personality consistency across conversations
+- [ ] 18-01-PLAN.md — Fetch 3-layer soul via RPC and refactor all prompt injection points
+- [ ] 18-02-PLAN.md — Add token estimation and 800-token budget validation with graceful truncation
 
 ### Phase 19: Daily Evolution Engine
 **Goal**: Bot autonomously reflects on interactions and updates its soul every night
@@ -254,7 +253,7 @@ Phases execute in numeric order: 17 → 18 → 19 → 20 → 21 → 22
 | 15. Goals Lifecycle | v1.3 | 2/2 | Complete | 2026-02-13 |
 | 16. Semantic Search | v1.3 | 3/3 | Complete | 2026-02-13 |
 | 17. Three-Layer Soul Schema | v1.4 | Complete    | 2026-02-15 | - |
-| 18. Prompt Integration | v1.4 | 0/3 | Not started | - |
+| 18. Prompt Integration | v1.4 | 0/2 | Not started | - |
 | 19. Daily Evolution Engine | v1.4 | 0/4 | Not started | - |
 | 20. Milestone Moments | v1.4 | 0/3 | Not started | - |
 | 21. Evolution Controls | v1.4 | 0/4 | Not started | - |
