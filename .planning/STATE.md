@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 21 of 22 (Evolution Controls)
-Plan: 1 of 4
+Plan: 2 of 4
 Status: Phase 21 in progress
-Last activity: 2026-02-16 — Completed 21-01 (Evolution Pause/Resume Controls)
+Last activity: 2026-02-16 — Completed 21-02 (Soul History and Rollback)
 
-Progress: [███████████░░░░░░░░░] 61% (30/49 plans complete across all milestones)
+Progress: [███████████░░░░░░░░░] 63% (31/49 plans complete across all milestones)
 
 ## Project Reference
 
@@ -19,8 +19,8 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 30 (across v1.0-v1.4)
-- Total execution time: 2000s (v1.4 so far)
+- Total plans completed: 31 (across v1.0-v1.4)
+- Total execution time: 2146s (v1.4 so far)
 
 **By Milestone:**
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 | v1.1 Heartbeat | 6-11 | 12/12 | Complete 2026-02-12 |
 | v1.2 Streaming | 12-13 | 4/4 | Complete 2026-02-13 |
 | v1.3 Smart Memory | 14-16 | 7/7 | Complete 2026-02-13 |
-| v1.4 Soul Evolution | 17-22 | 11/20 | In progress |
+| v1.4 Soul Evolution | 17-22 | 12/20 | In progress |
 
 **v1.4 Phase Breakdown:**
 
@@ -40,7 +40,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 | 18. Prompt Integration | 2/2 | Complete |
 | 19. Daily Evolution Engine | 2/2 | Complete |
 | 20. Milestone Moments | 2/3 | In progress |
-| 21. Evolution Controls | 1/4 | In progress |
+| 21. Evolution Controls | 2/4 | In progress |
 | 22. Growth Safeguards | 0/3 | Not started |
 
 ## Accumulated Context
@@ -75,6 +75,10 @@ Recent decisions affecting v1.4:
 - Subcommand parsing preserves backward compatibility (Phase 21-01): /soul <text> still sets personality
 - Silent skip when paused (Phase 21-01): Reduces log noise during paused periods
 - Show 3-layer soul with formatSoulForPrompt() (Phase 21-01): Richer context when checking current soul state
+- Direct query soul_versions for rollback target (Phase 21-02): get_soul_history RPC excludes reflection_notes, we only need the three layers
+- Rollback creates NEW version via save_soul_version (Phase 21-02): Preserves full history, never deletes. Rollback becomes part of evolution timeline
+- History command shows last 10 versions vs default 3 (Phase 21-02): History for user inspection needs more context, evolution still uses limit=3
+- reflection_notes records rollback action (Phase 21-02): Documents "Rollback to vN by user" for audit trail
 
 ### Pending Todos
 
@@ -86,10 +90,10 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-02-16 — Completed 21-01-PLAN.md (Evolution Pause/Resume Controls)
-**Next action:** Continue Phase 21 (plan 02)
+**Last session:** 2026-02-16 — Completed 21-02-PLAN.md (Soul History and Rollback)
+**Next action:** Continue Phase 21 (plan 03)
 **Resume file:** None
 
 ---
 
-*Updated: 2026-02-16T10:33:27Z*
+*Updated: 2026-02-16T10:39:16Z*
