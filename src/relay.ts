@@ -2964,6 +2964,56 @@ bot.command("soul", async (ctx) => {
     return;
   }
 
+  // Subcommand: rollback
+  if (subcommand === "rollback") {
+    const versionArg = args.split(/\s+/)[1];
+    const targetVersion = parseInt(versionArg, 10);
+
+    if (isNaN(targetVersion) || targetVersion < 0) {
+      await ctx.reply("Usage: /soul rollback <version>\nExample: /soul rollback 3\n\nUse /soul history to see available versions.");
+      return;
+    }
+
+    if (!supabase) {
+      await ctx.reply("Supabase not available.");
+      return;
+    }
+
+    // Fetch the target version from soul_versions
+    const { data: targetData, error: fetchError } = await supabase
+      .from("soul_versions")
+      .select("version, core_identity, active_values, recent_growth, token_count")
+      .eq("version", targetVersion)
+      .single();
+
+    if (fetchError || !targetData) {
+      await ctx.reply(`Version ${targetVersion} not found. Use /soul history to see available versions.`);
+      return;
+    }
+
+    // Save as NEW version (preserves history — rollback creates a new entry, never deletes)
+    const { data: newVersion, error: saveError } = await supabase.rpc("save_soul_version", {
+      p_core_identity: targetData.core_identity,
+      p_active_values: targetData.active_values,
+      p_recent_growth: targetData.recent_growth,
+      p_reflection_notes: `Rollback to v${targetVersion} by user`,
+      p_token_count: targetData.token_count || 0,
+    });
+
+    if (saveError) {
+      await ctx.reply(`Rollback failed: ${saveError.message}`);
+      return;
+    }
+
+    await logEventV2("soul_rollback", `Rolled back to v${targetVersion}, created v${newVersion}`, {
+      from_version: targetVersion,
+      new_version: newVersion,
+    }, ctx.threadInfo?.dbId);
+
+    await ctx.reply(`Rolled back to v${targetVersion}. Created as new v${newVersion}.\n\nThe previous soul is preserved in history.`);
+    return;
+  }
+
   // Default: set soul personality
   const success = await setSoul(args);
   if (success) {
