@@ -502,6 +502,14 @@ interface SoulVersion {
   created_at: string;
 }
 
+const SOUL_TOKEN_BUDGET = 800;
+
+function estimateTokens(text: string): number {
+  // Approximation: ~1.3 tokens per word for English text
+  // This avoids adding a tokenizer dependency
+  return Math.ceil(text.split(/\s+/).filter(Boolean).length * 1.3);
+}
+
 async function getCurrentSoul(): Promise<SoulVersion | null> {
   if (!supabase) return null;
   try {
@@ -529,7 +537,35 @@ async function formatSoulForPrompt(): Promise<string> {
       parts.push(`## Recent Growth\n${soulVersion.recent_growth}`);
     }
     if (parts.length > 0) {
-      return parts.join("\n\n");
+      const soulText = parts.join("\n\n");
+      const tokenEstimate = estimateTokens(soulText);
+
+      if (tokenEstimate > SOUL_TOKEN_BUDGET) {
+        console.warn(`Soul token estimate ${tokenEstimate} exceeds budget ${SOUL_TOKEN_BUDGET}, truncating`);
+        // Truncate by removing Recent Growth first (most ephemeral), then Active Values
+        // Core Identity is never truncated — it's the most stable layer
+        if (soulVersion.recent_growth) {
+          parts = parts.filter(p => !p.startsWith("## Recent Growth"));
+          const reduced = parts.join("\n\n");
+          if (estimateTokens(reduced) <= SOUL_TOKEN_BUDGET) {
+            return reduced;
+          }
+        }
+        if (soulVersion.active_values) {
+          parts = parts.filter(p => !p.startsWith("## Active Values"));
+          const reduced = parts.join("\n\n");
+          if (estimateTokens(reduced) <= SOUL_TOKEN_BUDGET) {
+            return reduced;
+          }
+        }
+        // If still over budget with just Core Identity, hard-truncate at word boundary
+        const coreOnly = soulVersion.core_identity;
+        const words = coreOnly.split(/\s+/);
+        const maxWords = Math.floor(SOUL_TOKEN_BUDGET / 1.3);
+        return "## Core Identity\n" + words.slice(0, maxWords).join(" ");
+      }
+
+      return soulText;
     }
   }
   // Fallback to flat bot_soul (for pre-evolution state or empty soul_versions)
