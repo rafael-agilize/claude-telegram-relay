@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 21 of 22 (Evolution Controls)
-Plan: 2 of 4
-Status: Phase 21 in progress
-Last activity: 2026-02-16 — Completed 21-02 (Soul History and Rollback)
+Phase: 22 of 22 (Growth Safeguards)
+Plan: 1 of 3
+Status: Phase 22 in progress
+Last activity: 2026-02-16 — Completed 22-01 (Growth Safeguards in Evolution Prompt)
 
-Progress: [███████████░░░░░░░░░] 63% (31/49 plans complete across all milestones)
+Progress: [████████████░░░░░░░░] 65% (32/49 plans complete across all milestones)
 
 ## Project Reference
 
@@ -19,8 +19,8 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 31 (across v1.0-v1.4)
-- Total execution time: 2146s (v1.4 so far)
+- Total plans completed: 32 (across v1.0-v1.4)
+- Total execution time: 3591s (v1.4 so far)
 
 **By Milestone:**
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 | v1.1 Heartbeat | 6-11 | 12/12 | Complete 2026-02-12 |
 | v1.2 Streaming | 12-13 | 4/4 | Complete 2026-02-13 |
 | v1.3 Smart Memory | 14-16 | 7/7 | Complete 2026-02-13 |
-| v1.4 Soul Evolution | 17-22 | 12/20 | In progress |
+| v1.4 Soul Evolution | 17-22 | 13/20 | In progress |
 
 **v1.4 Phase Breakdown:**
 
@@ -41,7 +41,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 | 19. Daily Evolution Engine | 2/2 | Complete |
 | 20. Milestone Moments | 2/3 | In progress |
 | 21. Evolution Controls | 2/4 | In progress |
-| 22. Growth Safeguards | 0/3 | Not started |
+| 22. Growth Safeguards | 1/3 | In progress |
 
 ## Accumulated Context
 
@@ -79,6 +79,9 @@ Recent decisions affecting v1.4:
 - Rollback creates NEW version via save_soul_version (Phase 21-02): Preserves full history, never deletes. Rollback becomes part of evolution timeline
 - History command shows last 10 versions vs default 3 (Phase 21-02): History for user inspection needs more context, evolution still uses limit=3
 - reflection_notes records rollback action (Phase 21-02): Documents "Rollback to vN by user" for audit trail
+- Growth indicator required for all non-skipped evolutions (Phase 22-01): Validates meaningful growth occurred in each evolution cycle
+- Five explicit growth principles prevent personality drift (Phase 22-01): Build/Learn/Preserve/Expand/Name ensure upward trajectory
+- EVOLUTION_SKIP bypasses growth indicator requirement (Phase 22-01): Returns null before validation, no false positives
 
 ### Pending Todos
 
@@ -90,10 +93,10 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-02-16 — Completed 21-02-PLAN.md (Soul History and Rollback)
-**Next action:** Continue Phase 21 (plan 03)
+**Last session:** 2026-02-16 — Completed 22-01-PLAN.md (Growth Safeguards in Evolution Prompt)
+**Next action:** Continue Phase 22 (plan 02)
 **Resume file:** None
 
 ---
 
-*Updated: 2026-02-16T10:39:16Z*
+*Updated: 2026-02-16T10:55:29Z*
