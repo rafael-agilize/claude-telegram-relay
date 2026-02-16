@@ -455,7 +455,8 @@ CREATE TABLE IF NOT EXISTS heartbeat_config (
   active_hours_start TEXT NOT NULL DEFAULT '08:00',
   active_hours_end TEXT NOT NULL DEFAULT '22:00',
   timezone TEXT NOT NULL DEFAULT 'America/Sao_Paulo',
-  enabled BOOLEAN DEFAULT true
+  enabled BOOLEAN DEFAULT true,
+  evolution_enabled BOOLEAN DEFAULT true  -- v1.4 Phase 21: Evolution pause/resume control
 );
 
 INSERT INTO heartbeat_config (interval_minutes, active_hours_start, active_hours_end, timezone, enabled)
