@@ -687,10 +687,34 @@ async function getSoulHistory(limit: number = 3): Promise<SoulVersion[]> {
   }
 }
 
+async function getMilestones(limit: number = 10): Promise<Array<{
+  id: string;
+  event_description: string;
+  emotional_weight: string;
+  lesson_learned: string;
+  created_at: string;
+}>> {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase.rpc("get_milestone_moments", {
+      p_limit: limit,
+    });
+    if (error) {
+      console.error("getMilestones RPC error:", error);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.error("getMilestones error:", e);
+    return [];
+  }
+}
+
 function buildEvolutionPrompt(
   currentSoul: SoulVersion | null,
   soulHistory: SoulVersion[],
-  messages: Array<{ role: string; content: string; thread_name: string; created_at: string }>
+  messages: Array<{ role: string; content: string; thread_name: string; created_at: string }>,
+  milestones: Array<{ event_description: string; emotional_weight: string; lesson_learned: string; created_at: string }>
 ): string {
   const now = new Date();
   const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -719,6 +743,16 @@ function buildEvolutionPrompt(
       const versionDate = v.created_at.split('T')[0];
       const corePreview = v.core_identity.substring(0, 80) + (v.core_identity.length > 80 ? "..." : "");
       return `**Version ${v.version}** (${versionDate}): ${corePreview}`;
+    }).join("\n");
+  }
+
+  // Format milestones
+  let milestonesText = "No milestone moments recorded yet.";
+  if (milestones.length > 0) {
+    milestonesText = milestones.map(m => {
+      const date = m.created_at.split('T')[0];
+      const lesson = m.lesson_learned ? ` — Lesson: ${m.lesson_learned}` : "";
+      return `- [${m.emotional_weight.toUpperCase()}] (${date}) ${m.event_description}${lesson}`;
     }).join("\n");
   }
 
@@ -765,6 +799,12 @@ ${currentSoulText}
 # Soul History (Recent Versions)
 
 ${historyText}
+
+# Milestone Moments (Formative Experiences)
+
+These are key moments that anchor your personality. Consider them during reflection — they represent your most meaningful growth experiences. Do not discard insights from these moments.
+
+${milestonesText}
 
 # Today's Interactions (Last 24 Hours)
 
@@ -1515,9 +1555,11 @@ async function performDailyEvolution(): Promise<void> {
   // Get current soul and history
   const currentSoul = await getCurrentSoul();
   const soulHistory = await getSoulHistory(3);
+  const milestones = await getMilestones(10);
+  console.log(`Evolution: ${milestones.length} milestone moments loaded`);
 
   // Build prompt
-  const prompt = buildEvolutionPrompt(currentSoul, soulHistory, messages);
+  const prompt = buildEvolutionPrompt(currentSoul, soulHistory, messages, milestones);
 
   // Call Claude (standalone, no --resume)
   console.log("Evolution: calling Claude for reflection...");
@@ -1567,6 +1609,7 @@ async function performDailyEvolution(): Promise<void> {
       version: newVersion,
       token_count: tokenEstimate,
       message_count: messages.length,
+      milestone_count: milestones.length,
     });
 
     // Deliver evolution report to Telegram
