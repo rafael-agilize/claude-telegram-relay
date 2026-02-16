@@ -171,13 +171,11 @@ Plans:
   4. Reflection generates new 3-layer soul compressed to ~800 tokens
   5. Old soul saved as version in soul_versions before update
   6. New soul text delivered to Rafa via Telegram (observer report, no approval needed)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 19-01: Create daily evolution cron job with configurable schedule
-- [ ] 19-02: Build reflection prompt that receives 24h context + current soul
-- [ ] 19-03: Implement soul version save-before-update logic
-- [ ] 19-04: Add Telegram notification for daily evolution reports
+- [ ] 19-01-PLAN.md — Data helpers (getLast24hMessages, getSoulHistory) + evolution timer infrastructure
+- [ ] 19-02-PLAN.md — Reflection prompt, Claude call, soul version save, Telegram notification
 
 ### Phase 20: Milestone Moments
 **Goal**: Bot detects and stores formative moments that anchor personality evolution
