@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 18 of 22 (Prompt Integration)
-Plan: 2 of 3
-Status: Plan 02 complete — ready for Plan 03
-Last activity: 2026-02-16 — Completed 18-02-PLAN.md (Token Budget Validation)
+Phase: 19 of 22 (Daily Evolution Engine)
+Plan: 1 of 4
+Status: Plan 01 complete — ready for Plan 02
+Last activity: 2026-02-16 — Completed 19-01-PLAN.md (Evolution Data Layer & Timer)
 
-Progress: [████████░░░░░░░░░░░░] 49% (23/47 plans complete across all milestones)
+Progress: [████████░░░░░░░░░░░░] 51% (24/47 plans complete across all milestones)
 
 ## Project Reference
 
@@ -19,8 +19,8 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 23 (across v1.0-v1.4)
-- Total execution time: 509s (v1.4 so far)
+- Total plans completed: 24 (across v1.0-v1.4)
+- Total execution time: 747s (v1.4 so far)
 
 **By Milestone:**
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 | v1.1 Heartbeat | 6-11 | 12/12 | Complete 2026-02-12 |
 | v1.2 Streaming | 12-13 | 4/4 | Complete 2026-02-13 |
 | v1.3 Smart Memory | 14-16 | 7/7 | Complete 2026-02-13 |
-| v1.4 Soul Evolution | 17-22 | 4/20 | In progress |
+| v1.4 Soul Evolution | 17-22 | 5/20 | In progress |
 
 **v1.4 Phase Breakdown:**
 
@@ -38,7 +38,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 |-------|-------|--------|
 | 17. Three-Layer Soul Schema | 2/2 | Complete |
 | 18. Prompt Integration | 2/3 | In progress |
-| 19. Daily Evolution Engine | 0/4 | Not started |
+| 19. Daily Evolution Engine | 1/4 | In progress |
 | 20. Milestone Moments | 0/3 | Not started |
 | 21. Evolution Controls | 0/4 | Not started |
 | 22. Growth Safeguards | 0/3 | Not started |
@@ -59,6 +59,9 @@ Recent decisions affecting v1.4:
 - Empty soul layers skipped in prompt output (Phase 18-01): Optimizes token usage when active_values/recent_growth not yet populated
 - Word-count * 1.3 token estimation (Phase 18-02): Avoids adding tokenizer dependency, keeps relay lightweight
 - 800-token soul budget with graceful truncation (Phase 18-02): Recent Growth → Active Values → Core Identity priority
+- Default limit=3 for getSoulHistory (Phase 19-01): Only recent context needed for reflection, reduces token overhead
+- Evolution runs at midnight outside active hours (Phase 19-01): User doesn't need to be awake for daily soul evolution
+- 30-min evolution timer interval (Phase 19-01): Balances responsiveness with resource efficiency
 
 ### Pending Todos
 
@@ -70,10 +73,10 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-02-16 — Completed Phase 18 Plan 02 (Token Budget Validation)
-**Next action:** `/gsd:execute-phase 18 03` to execute Plan 03 or `/gsd:plan-phase 18` to create next plan
+**Last session:** 2026-02-16 — Completed Phase 19 Plan 01 (Evolution Data Layer & Timer)
+**Next action:** `/gsd:execute-phase 19 02` to execute Plan 02
 **Resume file:** None
 
 ---
 
-*Updated: 2026-02-16T01:00:15Z*
+*Updated: 2026-02-16T01:45:54Z*
