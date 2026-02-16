@@ -1602,6 +1602,31 @@ async function performDailyEvolution(): Promise<void> {
     console.warn(`Evolution: token estimate ${tokenEstimate} exceeds budget ${SOUL_TOKEN_BUDGET}`);
   }
 
+  // Anti-regression guard: new soul shouldn't be dramatically shorter than current
+  const currentSoulText = [
+    currentSoul?.core_identity || "",
+    currentSoul?.active_values || "",
+    currentSoul?.recent_growth || "",
+  ].join(" ");
+  const currentLength = currentSoulText.trim().length;
+
+  if (currentLength > 0) {
+    const newLength = combinedSoulText.trim().length;
+    const ratio = newLength / currentLength;
+
+    if (ratio < 0.6) {
+      console.warn(
+        `Evolution: potential regression detected — new soul is ${Math.round(ratio * 100)}% of previous length (${newLength} vs ${currentLength} chars). Saving anyway with warning.`
+      );
+      await logEventV2("evolution_regression_warning", `New soul is ${Math.round(ratio * 100)}% of previous length`, {
+        current_length: currentLength,
+        new_length: newLength,
+        ratio: Math.round(ratio * 100),
+        growth_indicator: parsed.growthIndicator,
+      });
+    }
+  }
+
   // Save new version via RPC
   if (!supabase) {
     console.error("Evolution: cannot save — Supabase not available");
