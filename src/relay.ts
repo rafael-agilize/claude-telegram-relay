@@ -2942,6 +2942,28 @@ bot.command("soul", async (ctx) => {
     return;
   }
 
+  // Subcommand: history
+  if (subcommand === "history") {
+    const versions = await getSoulHistory(10);
+    if (versions.length === 0) {
+      await ctx.reply("No soul versions yet. Evolution hasn't run.");
+      return;
+    }
+
+    const lines = versions.map((v) => {
+      const date = new Date(v.created_at).toLocaleDateString("en-US", {
+        month: "short", day: "numeric", year: "numeric",
+        timeZone: EVOLUTION_TIMEZONE,
+      });
+      return `v${v.version} (${date}) — ${v.token_count} tokens`;
+    });
+
+    await ctx.reply(
+      `Soul Version History (last ${versions.length}):\n\n${lines.join("\n")}\n\nUse /soul rollback <version> to restore.`
+    );
+    return;
+  }
+
   // Default: set soul personality
   const success = await setSoul(args);
   if (success) {
