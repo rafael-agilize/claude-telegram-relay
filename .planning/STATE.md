@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 20 of 22 (Milestone Moments)
-Plan: 2 of 3
-Status: Phase 20 in progress
-Last activity: 2026-02-16 — Completed 20-02 (Milestone Integration into Daily Evolution)
+Phase: 21 of 22 (Evolution Controls)
+Plan: 1 of 4
+Status: Phase 21 in progress
+Last activity: 2026-02-16 — Completed 21-01 (Evolution Pause/Resume Controls)
 
-Progress: [███████████░░░░░░░░░] 59% (29/49 plans complete across all milestones)
+Progress: [███████████░░░░░░░░░] 61% (30/49 plans complete across all milestones)
 
 ## Project Reference
 
@@ -19,8 +19,8 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 29 (across v1.0-v1.4)
-- Total execution time: 1496s (v1.4 so far)
+- Total plans completed: 30 (across v1.0-v1.4)
+- Total execution time: 2000s (v1.4 so far)
 
 **By Milestone:**
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 | v1.1 Heartbeat | 6-11 | 12/12 | Complete 2026-02-12 |
 | v1.2 Streaming | 12-13 | 4/4 | Complete 2026-02-13 |
 | v1.3 Smart Memory | 14-16 | 7/7 | Complete 2026-02-13 |
-| v1.4 Soul Evolution | 17-22 | 10/20 | In progress |
+| v1.4 Soul Evolution | 17-22 | 11/20 | In progress |
 
 **v1.4 Phase Breakdown:**
 
@@ -40,7 +40,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 | 18. Prompt Integration | 2/2 | Complete |
 | 19. Daily Evolution Engine | 2/2 | Complete |
 | 20. Milestone Moments | 2/3 | In progress |
-| 21. Evolution Controls | 0/4 | Not started |
+| 21. Evolution Controls | 1/4 | In progress |
 | 22. Growth Safeguards | 0/3 | Not started |
 
 ## Accumulated Context
@@ -71,6 +71,10 @@ Recent decisions affecting v1.4:
 - Default limit 10 milestones for evolution (Phase 20-02): Balances rich historical context with token budget
 - Milestone section between Soul History and Today's Interactions (Phase 20-02): Chronological flow from stable past to formative past to immediate present
 - Explicit anti-drift guidance in evolution prompt (Phase 20-02): "Do not discard insights from these moments" prevents personality drift from formative experiences
+- evolution_enabled gates evolutionTick before hour check (Phase 21-01): No need to check time if evolution is globally paused
+- Subcommand parsing preserves backward compatibility (Phase 21-01): /soul <text> still sets personality
+- Silent skip when paused (Phase 21-01): Reduces log noise during paused periods
+- Show 3-layer soul with formatSoulForPrompt() (Phase 21-01): Richer context when checking current soul state
 
 ### Pending Todos
 
@@ -82,10 +86,10 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-02-16 — Completed 20-02-PLAN.md (Milestone Integration into Daily Evolution)
-**Next action:** Continue Phase 20 (plan 03)
+**Last session:** 2026-02-16 — Completed 21-01-PLAN.md (Evolution Pause/Resume Controls)
+**Next action:** Continue Phase 21 (plan 02)
 **Resume file:** None
 
 ---
 
-*Updated: 2026-02-16T08:35:24Z*
+*Updated: 2026-02-16T10:33:27Z*
