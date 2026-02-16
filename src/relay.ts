@@ -1632,6 +1632,19 @@ async function evolutionTick(): Promise<void> {
 
   evolutionRunning = true;
   try {
+    // Check if evolution is enabled
+    if (supabase) {
+      const { data } = await supabase
+        .from("heartbeat_config")
+        .select("evolution_enabled")
+        .limit(1)
+        .single();
+
+      if (data && data.evolution_enabled === false) {
+        return; // Silently skip — evolution is paused
+      }
+    }
+
     // Check if current hour matches configured evolution hour
     const now = new Date();
     const currentHour = parseInt(
@@ -2848,19 +2861,92 @@ ${messagesText}`;
 // COMMANDS
 // ============================================================
 
-// /soul command: set bot personality
+// /soul command: set bot personality or control evolution
 bot.command("soul", async (ctx) => {
   const text = ctx.match;
-  if (!text || text.trim().length === 0) {
-    const currentSoul = await getActiveSoul();
-    await ctx.reply(`Current soul:\n\n${currentSoul}\n\nUsage: /soul <personality description>`);
+  const args = text?.trim() || "";
+  const subcommand = args.split(/\s+/)[0]?.toLowerCase();
+
+  // Subcommand: show current soul
+  if (!args) {
+    const currentSoul = await formatSoulForPrompt();
+    await ctx.reply(`Current soul:\n\n${currentSoul}\n\nUsage:\n- /soul <personality> — Set new soul\n- /soul pause — Stop daily evolution\n- /soul resume — Resume daily evolution`);
     return;
   }
 
-  const success = await setSoul(text.trim());
+  // Subcommand: pause evolution
+  if (subcommand === "pause") {
+    if (!supabase) {
+      await ctx.reply("Supabase not configured. Cannot pause evolution.");
+      return;
+    }
+
+    const { data: currentConfig } = await supabase
+      .from("heartbeat_config")
+      .select("evolution_enabled")
+      .limit(1)
+      .single();
+
+    if (currentConfig && currentConfig.evolution_enabled === false) {
+      await ctx.reply("Evolution is already paused.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("heartbeat_config")
+      .update({ evolution_enabled: false, updated_at: new Date().toISOString() })
+      .eq("id", currentConfig?.id || "");
+
+    if (error) {
+      console.error("Failed to pause evolution:", error);
+      await ctx.reply("Failed to pause evolution. Check Supabase connection.");
+      return;
+    }
+
+    await logEventV2("evolution_paused", "User paused daily evolution", {}, ctx.threadInfo?.dbId);
+    await ctx.reply("Evolution paused. Current soul is frozen. Use /soul resume to restart.");
+    return;
+  }
+
+  // Subcommand: resume evolution
+  if (subcommand === "resume") {
+    if (!supabase) {
+      await ctx.reply("Supabase not configured. Cannot resume evolution.");
+      return;
+    }
+
+    const { data: currentConfig } = await supabase
+      .from("heartbeat_config")
+      .select("evolution_enabled")
+      .limit(1)
+      .single();
+
+    if (currentConfig && currentConfig.evolution_enabled === true) {
+      await ctx.reply("Evolution is already running.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("heartbeat_config")
+      .update({ evolution_enabled: true, updated_at: new Date().toISOString() })
+      .eq("id", currentConfig?.id || "");
+
+    if (error) {
+      console.error("Failed to resume evolution:", error);
+      await ctx.reply("Failed to resume evolution. Check Supabase connection.");
+      return;
+    }
+
+    await logEventV2("evolution_resumed", "User resumed daily evolution", {}, ctx.threadInfo?.dbId);
+    await ctx.reply("Evolution resumed. Daily reflection will continue.");
+    return;
+  }
+
+  // Default: set soul personality
+  const success = await setSoul(args);
   if (success) {
-    await logEventV2("soul_updated", text.trim().substring(0, 100), {}, ctx.threadInfo?.dbId);
-    await ctx.reply(`Soul updated! New personality:\n\n${text.trim()}`);
+    await logEventV2("soul_updated", args.substring(0, 100), {}, ctx.threadInfo?.dbId);
+    await ctx.reply(`Soul updated! New personality:\n\n${args}`);
   } else {
     await ctx.reply("Failed to update soul. Check Supabase connection.");
   }
