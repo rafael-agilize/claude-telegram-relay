@@ -873,6 +873,7 @@ function parseEvolutionResponse(response: string): {
   coreIdentity: string;
   activeValues: string;
   recentGrowth: string;
+  growthIndicator: string;
   report: string;
 } | null {
   // Check for skip signal
@@ -884,9 +885,10 @@ function parseEvolutionResponse(response: string): {
   const coreMatch = response.match(/\[CORE_IDENTITY\]([\s\S]*?)\[\/CORE_IDENTITY\]/);
   const valuesMatch = response.match(/\[ACTIVE_VALUES\]([\s\S]*?)\[\/ACTIVE_VALUES\]/);
   const growthMatch = response.match(/\[RECENT_GROWTH\]([\s\S]*?)\[\/RECENT_GROWTH\]/);
+  const indicatorMatch = response.match(/\[GROWTH_INDICATOR\]([\s\S]*?)\[\/GROWTH_INDICATOR\]/);
   const reportMatch = response.match(/\[EVOLUTION_REPORT\]([\s\S]*?)\[\/EVOLUTION_REPORT\]/);
 
-  if (!coreMatch || !valuesMatch || !growthMatch || !reportMatch) {
+  if (!coreMatch || !valuesMatch || !growthMatch || !indicatorMatch || !reportMatch) {
     console.error("Evolution: failed to parse response — missing required sections");
     return null;
   }
@@ -895,6 +897,7 @@ function parseEvolutionResponse(response: string): {
     coreIdentity: coreMatch[1].trim(),
     activeValues: valuesMatch[1].trim(),
     recentGrowth: growthMatch[1].trim(),
+    growthIndicator: indicatorMatch[1].trim(),
     report: reportMatch[1].trim(),
   };
 }
@@ -1629,10 +1632,11 @@ async function performDailyEvolution(): Promise<void> {
       token_count: tokenEstimate,
       message_count: messages.length,
       milestone_count: milestones.length,
+      growth_indicator: parsed.growthIndicator,
     });
 
     // Deliver evolution report to Telegram
-    const reportMessage = `🌱 **Daily Soul Evolution (v${newVersion})**\n\n${parsed.report}\n\n_Token count: ${tokenEstimate} / ${SOUL_TOKEN_BUDGET}_`;
+    const reportMessage = `🌱 **Daily Soul Evolution (v${newVersion})**\n\n${parsed.report}\n\n📈 **Growth:** ${parsed.growthIndicator}\n\n_Token count: ${tokenEstimate} / ${SOUL_TOKEN_BUDGET}_`;
     await sendHeartbeatToTelegram(reportMessage);
 
     console.log("Evolution: report delivered to Telegram");
