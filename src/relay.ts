@@ -864,7 +864,7 @@ The growth indicator should be a single sentence identifying the specific improv
 
 **If no meaningful interactions happened today:** Output only the text "EVOLUTION_SKIP" (no tags) and I will skip this evolution cycle.
 
-Build on your previous versions for continuity. This is your daily self-reflection.`;
+Build on your previous versions for continuity. Your evolved soul should be at least as rich and detailed as the current version — never shorter or simpler. This is your daily self-reflection.`;
 
   return prompt;
 }
