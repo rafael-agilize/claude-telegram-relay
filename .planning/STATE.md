@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 20 of 22 (Milestone Moments)
-Plan: 0 of 3
-Status: Phase 19 complete — ready to plan Phase 20
-Last activity: 2026-02-16 — Completed Phase 19 (Daily Evolution Engine)
+Plan: 1 of 3
+Status: Phase 20 in progress
+Last activity: 2026-02-16 — Completed 20-01 (Milestone Intent Parsing)
 
-Progress: [██████████░░░░░░░░░░] 55% (27/49 plans complete across all milestones)
+Progress: [███████████░░░░░░░░░] 57% (28/49 plans complete across all milestones)
 
 ## Project Reference
 
@@ -19,8 +19,8 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 27 (across v1.0-v1.4)
-- Total execution time: 1216s (v1.4 so far)
+- Total plans completed: 28 (across v1.0-v1.4)
+- Total execution time: 1406s (v1.4 so far)
 
 **By Milestone:**
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 | v1.1 Heartbeat | 6-11 | 12/12 | Complete 2026-02-12 |
 | v1.2 Streaming | 12-13 | 4/4 | Complete 2026-02-13 |
 | v1.3 Smart Memory | 14-16 | 7/7 | Complete 2026-02-13 |
-| v1.4 Soul Evolution | 17-22 | 8/20 | In progress |
+| v1.4 Soul Evolution | 17-22 | 9/20 | In progress |
 
 **v1.4 Phase Breakdown:**
 
@@ -39,7 +39,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 | 17. Three-Layer Soul Schema | 2/2 | Complete |
 | 18. Prompt Integration | 2/2 | Complete |
 | 19. Daily Evolution Engine | 2/2 | Complete |
-| 20. Milestone Moments | 0/3 | Not started |
+| 20. Milestone Moments | 1/3 | In progress |
 | 21. Evolution Controls | 0/4 | Not started |
 | 22. Growth Safeguards | 0/3 | Not started |
 
@@ -66,6 +66,8 @@ Recent decisions affecting v1.4:
 - Token budget validation is permissive (Phase 19-02): Logs warning but proceeds, trusting Claude to stay within budget
 - Message truncation strategy (Phase 19-02): Last 100 messages, 200 chars each, balances context richness with token efficiency
 - EVOLUTION_SKIP as graceful no-op (Phase 19-02): Preserves previous soul version when no meaningful interactions occur
+- Event description capped at 300 chars (Phase 20-01): Milestones are richer narratives than REMEMBER facts
+- Default weight is 'meaningful' (Phase 20-01): Balances ease of use with emotional nuance
 
 ### Pending Todos
 
@@ -77,10 +79,10 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-02-16 — Completed Phase 19 (Daily Evolution Engine)
-**Next action:** `/gsd:plan-phase 20` to plan Phase 20 (Milestone Moments)
+**Last session:** 2026-02-16 — Completed 20-01-PLAN.md (Milestone Intent Parsing)
+**Next action:** Continue Phase 20 (plans 02-03)
 **Resume file:** None
 
 ---
 
-*Updated: 2026-02-16T01:56:39Z*
+*Updated: 2026-02-16T08:31:41Z*
