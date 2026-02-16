@@ -492,6 +492,50 @@ async function getRelevantMemory(
   }
 }
 
+interface SoulVersion {
+  id: string;
+  version: number;
+  core_identity: string;
+  active_values: string;
+  recent_growth: string;
+  token_count: number;
+  created_at: string;
+}
+
+async function getCurrentSoul(): Promise<SoulVersion | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.rpc("get_current_soul");
+    if (error || !data || data.length === 0) return null;
+    return data[0] as SoulVersion;
+  } catch (e) {
+    console.error("getCurrentSoul error:", e);
+    return null;
+  }
+}
+
+async function formatSoulForPrompt(): Promise<string> {
+  // Try 3-layer soul first (from soul_versions table)
+  const soulVersion = await getCurrentSoul();
+  if (soulVersion) {
+    let parts: string[] = [];
+    if (soulVersion.core_identity) {
+      parts.push(`## Core Identity\n${soulVersion.core_identity}`);
+    }
+    if (soulVersion.active_values) {
+      parts.push(`## Active Values\n${soulVersion.active_values}`);
+    }
+    if (soulVersion.recent_growth) {
+      parts.push(`## Recent Growth\n${soulVersion.recent_growth}`);
+    }
+    if (parts.length > 0) {
+      return parts.join("\n\n");
+    }
+  }
+  // Fallback to flat bot_soul (for pre-evolution state or empty soul_versions)
+  return await getActiveSoul();
+}
+
 async function getActiveSoul(): Promise<string> {
   if (!supabase) return "You are a helpful, concise assistant responding via Telegram.";
   try {
