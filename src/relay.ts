@@ -2519,23 +2519,19 @@ async function acquireLock(): Promise<boolean> {
         console.log(`Another instance running (PID: ${pid})`);
         return false;
       } catch {
-        console.log("Stale lock found, taking over...");
+        console.log("Stale lock found, removing...");
+        await unlink(LOCK_FILE).catch(() => {});
       }
     }
 
-    // Use exclusive flag to prevent race conditions between instances
-    const fd = await open(LOCK_FILE, "wx").catch(() => null);
-    if (fd) {
-      await fd.writeFile(process.pid.toString());
-      await fd.close();
-    } else {
-      // File was created between our check and open — retry with overwrite
-      // (only happens after stale lock removal)
-      await writeFile(LOCK_FILE, process.pid.toString());
-    }
+    // Atomic exclusive create — fails if another process created it between our check and here
+    const fd = await open(LOCK_FILE, "wx");
+    await fd.writeFile(process.pid.toString());
+    await fd.close();
     return true;
   } catch (error) {
-    console.error("Lock error:", error);
+    // "wx" flag throws if file exists — another instance won the race
+    console.error("Could not acquire lock — another instance may have started:", (error as Error).message);
     return false;
   }
 }
