@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 25 of 25 (Intent Validation & Input Hardening)
-Plan: 01 of 02
+Plan: 02 of 02
 Status: Complete
-Last activity: 2026-02-17 — Completed 25-01 Intent validation with FORGET guards and per-response caps
+Last activity: 2026-02-17 — Completed 25-02 Input hardening with /soul cap, memory eviction, and atomic locks
 
-Progress: [█████████████████████████████████████████████░░░] 98% (50/51 plans estimated)
+Progress: [██████████████████████████████████████████████████] 100% (51/51 plans)
 
 ## Project Reference
 
@@ -19,9 +19,9 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 50 (across v1.0-v1.5)
-- Average duration: ~22 min
-- Total execution time: ~18.1 hours
+- Total plans completed: 51 (across v1.0-v1.5)
+- Average duration: ~21 min
+- Total execution time: ~18.2 hours
 
 **By Milestone:**
 
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 | v1.2 Streaming | 12-13 | 4/4 | Complete 2026-02-13 |
 | v1.3 Smart Memory | 14-16 | 7/7 | Complete 2026-02-13 |
 | v1.4 Soul Evolution | 17-22 | 12/12 | Complete 2026-02-16 |
-| v1.5 Security Hardening | 23-25 | 5/6 | In Progress |
+| v1.5 Security Hardening | 23-25 | 6/6 | Complete 2026-02-17 |
 
 ## Accumulated Context
 
@@ -55,6 +55,10 @@ Recent decisions affecting current work:
 - [Phase 25-01]: FORGET requires 10+ char search text and >50% word overlap (prevents mass deletion)
 - [Phase 25-01]: Per-response caps: 5 REMEMBER, 3 GOAL, 1 CRON, 3 FORGET (prevents flooding)
 - [Phase 25-01]: REMEMBER/GOAL deduplicated within same response via normalized content Set
+- [Phase 25-02]: /soul content capped at 2000 chars with user feedback
+- [Phase 25-02]: Memory caps: 100 facts, 50 goals with oldest-first eviction
+- [Phase 25-02]: Filename sanitization uses allowlist ([a-zA-Z0-9._-]) + null byte stripping
+- [Phase 25-02]: Lock file acquisition is atomic-only (no fallback overwrite)
 
 ### Pending Todos
 
@@ -66,8 +70,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-02-17 — Completed 25-01-PLAN.md (Intent validation & input hardening)
-**Next action:** Continue to Phase 25 Plan 02 (if exists)
+**Last session:** 2026-02-17 — Completed 25-02-PLAN.md (Input hardening)
+**Next action:** Phase 25 complete. Ready for milestone completion or new phase.
 **Resume file:** None
 
 ---
