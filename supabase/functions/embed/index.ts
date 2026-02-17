@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
       const err = await embeddingResponse.text();
       console.error("OpenAI API error:", err);
       return new Response(
-        JSON.stringify({ error: "OpenAI API error", details: err }),
+        JSON.stringify({ error: "Embedding generation failed" }),
         { status: 502, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
 
     if (!embedding) {
       return new Response(
-        JSON.stringify({ error: "No embedding returned from OpenAI" }),
+        JSON.stringify({ error: "Embedding generation failed" }),
         { status: 502, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     if (updateError) {
       console.error("Supabase update error:", updateError);
       return new Response(
-        JSON.stringify({ error: "Database update failed", details: updateError.message }),
+        JSON.stringify({ error: "Processing failed" }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("Embed function error:", err);
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
+      JSON.stringify({ error: "Internal error" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

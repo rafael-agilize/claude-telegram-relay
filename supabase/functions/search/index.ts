@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       const err = await embeddingResponse.text();
       console.error("OpenAI API error:", err);
       return new Response(
-        JSON.stringify({ results: [], error: "OpenAI API error" }),
+        JSON.stringify({ results: [] }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
 
     if (!queryEmbedding) {
       return new Response(
-        JSON.stringify({ results: [], error: "No embedding returned" }),
+        JSON.stringify({ results: [] }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
     if (error) {
       console.error("match_memory RPC error:", error);
       return new Response(
-        JSON.stringify({ results: [], error: error.message }),
+        JSON.stringify({ results: [] }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("Search function error:", err);
     return new Response(
-      JSON.stringify({ results: [], error: err instanceof Error ? err.message : "Unknown error" }),
+      JSON.stringify({ results: [] }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   }
