@@ -3538,6 +3538,90 @@ bot.on("message:photo", async (ctx) => {
   }
 });
 
+// Cron job approval/rejection via inline keyboard
+bot.on("callback_query:data", async (ctx) => {
+  const data = ctx.callbackQuery.data;
+
+  // Only handle cron approval callbacks
+  if (!data.startsWith("cron_approve:") && !data.startsWith("cron_reject:")) {
+    return;
+  }
+
+  // Security: only authorized user can approve/reject
+  if (ctx.callbackQuery.from.id.toString() !== ALLOWED_USER_ID) {
+    await ctx.answerCallbackQuery({ text: "Unauthorized" });
+    return;
+  }
+
+  const [action, jobId] = data.split(":");
+  if (!jobId) {
+    await ctx.answerCallbackQuery({ text: "Invalid callback data" });
+    return;
+  }
+
+  if (action === "cron_approve") {
+    // Enable the job
+    if (supabase) {
+      const { error } = await supabase
+        .from("cron_jobs")
+        .update({ enabled: true })
+        .eq("id", jobId);
+
+      if (error) {
+        console.error(`[CronApproval] Failed to approve job ${jobId}:`, error);
+        await ctx.answerCallbackQuery({ text: "Failed to approve job" });
+        return;
+      }
+
+      // Compute and set next_run_at now that job is enabled
+      const { data: jobData } = await supabase
+        .from("cron_jobs")
+        .select("*")
+        .eq("id", jobId)
+        .single();
+
+      if (jobData) {
+        const nextRun = computeNextRun(jobData as CronJob);
+        if (nextRun) {
+          await supabase.from("cron_jobs").update({ next_run_at: nextRun }).eq("id", jobId);
+        }
+      }
+
+      await logEventV2("cron_approved", `User approved cron job: ${jobId}`, { job_id: jobId });
+      console.log(`[CronApproval] Job ${jobId} approved by user`);
+
+      // Update the message to show approved state
+      await ctx.editMessageText(`✅ *Cron job approved and activated!*\n\n_Job ID: ${jobId}_`, {
+        parse_mode: "Markdown",
+      });
+      await ctx.answerCallbackQuery({ text: "Cron job approved!" });
+    }
+  } else if (action === "cron_reject") {
+    // Delete the job
+    if (supabase) {
+      const { error } = await supabase
+        .from("cron_jobs")
+        .delete()
+        .eq("id", jobId);
+
+      if (error) {
+        console.error(`[CronApproval] Failed to reject job ${jobId}:`, error);
+        await ctx.answerCallbackQuery({ text: "Failed to reject job" });
+        return;
+      }
+
+      await logEventV2("cron_rejected", `User rejected cron job: ${jobId}`, { job_id: jobId });
+      console.log(`[CronApproval] Job ${jobId} rejected by user`);
+
+      // Update the message to show rejected state
+      await ctx.editMessageText(`❌ *Cron job rejected and deleted.*\n\n_Job ID: ${jobId}_`, {
+        parse_mode: "Markdown",
+      });
+      await ctx.answerCallbackQuery({ text: "Cron job rejected" });
+    }
+  }
+});
+
 // Documents
 bot.on("message:document", async (ctx) => {
   const doc = ctx.message.document;
