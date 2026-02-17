@@ -82,11 +82,11 @@
   2. Embed function fetches content from database, never trusts client input
   3. Search function enforces match_count ≤ 20 and match_threshold ≥ 0.5
   4. Edge Function errors return generic messages to callers, detailed logs stay server-side
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 23-01: TBD
-- [ ] 23-02: TBD
+- [ ] 23-01-PLAN.md — Auth guards + error sanitization (EDGE-01, EDGE-04)
+- [ ] 23-02-PLAN.md — Input validation hardening (EDGE-02, EDGE-03)
 
 ### Phase 24: Intent Injection Defense
 **Goal**: Context-aware intent restrictions with user confirmation
@@ -147,7 +147,7 @@ Phases execute in numeric order: 23 → 24 → 25
 | 20. Milestone Moments | v1.4 | 2/2 | Complete | 2026-02-16 |
 | 21. Evolution Controls | v1.4 | 2/2 | Complete | 2026-02-16 |
 | 22. Growth Safeguards | v1.4 | 2/2 | Complete | 2026-02-16 |
-| 23. Edge Function Security | v1.5 | 0/2 | Not started | - |
+| 23. Edge Function Security | v1.5 | 0/2 | Planned | - |
 | 24. Intent Injection Defense | v1.5 | 0/2 | Not started | - |
 | 25. Intent Validation + Input Hardening | v1.5 | 0/2 | Not started | - |
 
