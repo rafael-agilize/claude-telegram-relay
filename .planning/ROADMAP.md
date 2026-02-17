@@ -112,11 +112,11 @@ Plans:
   3. /soul command rejects content >2000 chars with user feedback
   4. Memory capped at 100 facts + 50 goals with automatic eviction of oldest entries
   5. Filename sanitization uses allowlist regex, strips null bytes
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 25-01: TBD
-- [ ] 25-02: TBD
+- [ ] 25-01-PLAN.md — Intent validation: FORGET safety guards + per-response intent caps with dedup
+- [ ] 25-02-PLAN.md — Input hardening: /soul cap, memory eviction, filename allowlist, atomic lock
 
 ## Progress
 
