@@ -2153,6 +2153,11 @@ async function processIntents(response: string, threadDbId?: string, context: In
   // Get the allowlist for this context
   const allowed = INTENT_ALLOWLIST[context];
 
+  // Per-response caps and deduplication
+  const INTENT_CAPS: Record<string, number> = { REMEMBER: 5, GOAL: 3, CRON: 1, FORGET: 3 };
+  const intentCounts: Record<string, number> = { REMEMBER: 0, GOAL: 0, CRON: 0, FORGET: 0 };
+  const seenContent = new Set<string>();
+
   // [REMEMBER: concise fact about the user]
   const rememberMatches = response.matchAll(/\[REMEMBER:\s*(.+?)\]/gi);
   for (const match of rememberMatches) {
@@ -2160,8 +2165,16 @@ async function processIntents(response: string, threadDbId?: string, context: In
       console.warn(`[Intents] Blocked REMEMBER intent in '${context}' context: ${match[1].trim().substring(0, 50)}`);
     } else {
       const fact = match[1].trim();
-      // Security: cap fact length to prevent memory abuse
-      if (fact.length > 0 && fact.length <= 200) {
+      const normalized = fact.toLowerCase().trim();
+
+      // Check cap
+      if (intentCounts.REMEMBER >= INTENT_CAPS.REMEMBER) {
+        console.warn(`[Intents] REMEMBER cap reached (${INTENT_CAPS.REMEMBER}), skipping: ${fact.substring(0, 50)}`);
+      } else if (seenContent.has(normalized)) {
+        console.warn(`[Intents] Duplicate REMEMBER skipped: ${fact.substring(0, 50)}`);
+      } else if (fact.length > 0 && fact.length <= 200) {
+        intentCounts.REMEMBER++;
+        seenContent.add(normalized);
         const ok = await insertMemory(fact, "fact", threadDbId);
         if (ok) {
           console.log(`Remembered: ${fact}`);
@@ -2187,7 +2200,16 @@ async function processIntents(response: string, threadDbId?: string, context: In
     } else {
       const goalText = match[1].trim();
       const deadline = match[2]?.trim() || null;
-      if (goalText.length > 0 && goalText.length <= 200) {
+      const normalized = goalText.toLowerCase().trim();
+
+      // Check cap
+      if (intentCounts.GOAL >= INTENT_CAPS.GOAL) {
+        console.warn(`[Intents] GOAL cap reached (${INTENT_CAPS.GOAL}), skipping: ${goalText.substring(0, 50)}`);
+      } else if (seenContent.has(normalized)) {
+        console.warn(`[Intents] Duplicate GOAL skipped: ${goalText.substring(0, 50)}`);
+      } else if (goalText.length > 0 && goalText.length <= 200) {
+        intentCounts.GOAL++;
+        seenContent.add(normalized);
         const ok = await insertMemory(goalText, "goal", threadDbId, deadline);
         if (ok) {
           console.log(
@@ -2231,10 +2253,15 @@ async function processIntents(response: string, threadDbId?: string, context: In
       console.warn(`[Intents] Blocked FORGET intent in '${context}' context: ${match[1].trim().substring(0, 50)}`);
     } else {
       const searchText = match[1].trim();
-      if (searchText.length < 10) {
+
+      // Check cap
+      if (intentCounts.FORGET >= INTENT_CAPS.FORGET) {
+        console.warn(`[Intents] FORGET cap reached (${INTENT_CAPS.FORGET}), skipping: ${searchText.substring(0, 50)}`);
+      } else if (searchText.length < 10) {
         console.warn(`[Intents] Rejected FORGET: search text too short (${searchText.length} chars)`);
         failures.push(`FORGET search too short: "${searchText}"`);
       } else {
+        intentCounts.FORGET++;
         const deleted = await deleteMemory(searchText);
         if (deleted) {
           console.log(`Forgot memory matching: ${searchText}`);
@@ -2256,9 +2283,13 @@ async function processIntents(response: string, threadDbId?: string, context: In
       const schedule = match[1].trim();
       const prompt = match[2].trim();
 
-      if (schedule.length > 0 && prompt.length > 0 && prompt.length <= 500) {
+      // Check cap (max 1 CRON per response)
+      if (intentCounts.CRON >= INTENT_CAPS.CRON) {
+        console.warn(`[Intents] CRON cap reached (${INTENT_CAPS.CRON}), skipping: ${prompt.substring(0, 50)}`);
+      } else if (schedule.length > 0 && prompt.length > 0 && prompt.length <= 500) {
         const scheduleType = detectScheduleType(schedule);
         if (scheduleType) {
+          intentCounts.CRON++;
           const name = prompt.length <= 50 ? prompt : prompt.substring(0, 47) + "...";
           // Agent-created jobs start DISABLED — require user approval
           const job = await createCronJob(name, schedule, scheduleType, prompt, threadDbId || undefined, "agent", false);
