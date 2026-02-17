@@ -25,26 +25,49 @@ Deno.serve(async (req) => {
   try {
     const payload = await req.json();
 
-    // Database webhook sends: { type: "INSERT", record: { id, content, ... } }
-    // Direct invocation sends: { id, content }
-    const record = payload.record || payload;
+    // Database webhook sends: { type: "INSERT", record: { id, ... } }
+    // Direct invocation sends: { id }
+    const id = payload.record?.id || payload.id;
 
-    if (!record.id || !record.content) {
+    if (!id) {
       return new Response(
-        JSON.stringify({ error: "Missing id or content" }),
+        JSON.stringify({ error: "Missing record ID" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
+    // EDGE-02: Fetch content from database (never trust client-supplied content)
+    const { data: row, error: fetchError } = await supabase
+      .from("global_memory")
+      .select("id, content, embedding")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !row) {
+      console.warn(`Record not found: ${id}`);
+      return new Response(
+        JSON.stringify({ error: "Record not found" }),
+        { status: 404, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     // Skip if embedding already exists (idempotency)
-    if (record.embedding) {
+    if (row.embedding) {
       return new Response(
         JSON.stringify({ skipped: true, reason: "embedding already exists" }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    // Generate embedding via OpenAI
+    // Skip if content is missing
+    if (!row.content) {
+      return new Response(
+        JSON.stringify({ error: "Record has no content" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Generate embedding via OpenAI (using DB-sourced content)
     const embeddingResponse = await fetch(
       "https://api.openai.com/v1/embeddings",
       {
@@ -55,7 +78,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: "text-embedding-3-small",
-          input: record.content,
+          input: row.content,
         }),
       }
     );
@@ -83,7 +106,7 @@ Deno.serve(async (req) => {
     const { error: updateError } = await supabase
       .from("global_memory")
       .update({ embedding: JSON.stringify(embedding) })
-      .eq("id", record.id);
+      .eq("id", row.id);
 
     if (updateError) {
       console.error("Supabase update error:", updateError);
@@ -93,10 +116,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Embedded memory ${record.id}: "${record.content.substring(0, 50)}..."`);
+    console.log(`Embedded memory ${row.id}: "${row.content.substring(0, 50)}..."`);
 
     return new Response(
-      JSON.stringify({ success: true, id: record.id }),
+      JSON.stringify({ success: true, id: row.id }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   } catch (err) {
