@@ -1,5 +1,27 @@
 # Milestones
 
+## v1.5 Security Hardening (Shipped: 2026-02-17)
+
+**Delivered:** Fixed all 13 security vulnerabilities (4 HIGH, 9 MEDIUM) across Edge Functions, intent system, and relay inputs without breaking existing capabilities.
+
+**Phases completed:** 23-25 (3 phases, 6 plans)
+**Lines changed:** +436 / -130
+**Timeline:** 1 day (2026-02-16 → 2026-02-17)
+**Git range:** `feat(23-01)` → `fix(25-02)`
+**Archive:** [Roadmap](milestones/v1.5-ROADMAP.md) | [Requirements](milestones/v1.5-REQUIREMENTS.md) | [Audit](milestones/v1.5-MILESTONE-AUDIT.md)
+
+**Key accomplishments:**
+- JWT authentication on Edge Functions — reject unauthenticated callers, DB-sourced content for embed
+- Context-aware intent allowlists — block CRON/FORGET in heartbeat and cron contexts
+- Agent cron job approval flow — InlineKeyboard confirmation before activation
+- FORGET safety guards — 10+ char minimum and 50%+ content overlap required
+- Per-response intent caps (5 REMEMBER, 3 GOAL, 1 CRON, 3 FORGET) with content deduplication
+- Input hardening — /soul 2000 char cap, memory eviction (100/50), allowlist filename sanitization, atomic lock
+
+**What's next:** TBD — project feature-complete with security hardened
+
+---
+
 ## v1.4 Soul Evolution (Shipped: 2026-02-16)
 
 **Phases:** 17-22 (6 phases, 12 plans)
@@ -63,3 +85,5 @@
 - Intent system ([REMEMBER:], [FORGET:], [VOICE_REPLY])
 
 ---
+
+

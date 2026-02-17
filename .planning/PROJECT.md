@@ -2,26 +2,15 @@
 
 ## Project: Claude Telegram Relay
 
-**Description:** A relay that bridges Telegram to the Claude Code CLI with persistent memory, voice I/O, proactive agent capabilities, self-evolving personality, and unrestricted permissions.
+**Description:** A relay that bridges Telegram to the Claude Code CLI with persistent memory, voice I/O, proactive agent capabilities, self-evolving personality, security-hardened intents, and unrestricted permissions.
 
 **Tech Stack:** Bun runtime, TypeScript, Grammy (Telegram Bot), Supabase (PostgreSQL + Edge Functions), Claude CLI, Groq Whisper, ElevenLabs TTS, croner (cron scheduling), OpenAI Embeddings (via Edge Functions)
 
-**Architecture:** Single-file relay (`src/relay.ts` ~3,800 lines) + 2 Supabase Edge Functions. Message flow: Telegram -> Grammy handler -> buildPrompt() -> callClaude() via Bun.spawn -> processIntents() -> response back to Telegram.
-
-## Current Milestone: v1.5 Security Hardening
-
-**Goal:** Fix all 13 security vulnerabilities from full audit (4 HIGH, 9 MEDIUM) without breaking existing capabilities.
-
-**Target features:**
-- Edge Function authentication and input validation (vulns 1, 2, 8, 9)
-- Context-aware intent allowlisting to prevent prompt injection escalation (vulns 3, 4, 7)
-- Intent system hardening — FORGET matching, per-response caps, confirmation flow (vulns 5, 6)
-- Relay input validation — /soul length cap, memory entry limits, filename allowlist (vulns 10, 11, 12)
-- Lock file race condition fix (vuln 13)
+**Architecture:** Single-file relay (`src/relay.ts` ~4,050 lines) + 2 Supabase Edge Functions. Message flow: Telegram -> Grammy handler -> buildPrompt() -> callClaude() via Bun.spawn -> processIntents() -> response back to Telegram.
 
 ## Core Value
 
-Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, semantic search, real-time feedback, and self-evolving personality.
+Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, semantic search, real-time feedback, self-evolving personality, and defense-in-depth security.
 
 ## Requirements
 
@@ -45,21 +34,22 @@ Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactiv
 - ✓ Soul versioning, history, and rollback — v1.4
 - ✓ Evolution controls (pause/resume/status) — v1.4
 - ✓ Growth safeguards with anti-regression validation — v1.4
+- ✓ Edge Function JWT authentication (service_role verification) — v1.5
+- ✓ Embed function fetches content from DB by row ID (no client trust) — v1.5
+- ✓ Search function input bounds (match_count ≤ 20, match_threshold ≥ 0.5) — v1.5
+- ✓ Generic error responses in Edge Functions (no internal detail leaks) — v1.5
+- ✓ Context-aware intent allowlists (CRON/FORGET blocked in heartbeat/cron) — v1.5
+- ✓ Agent cron job approval flow (InlineKeyboard confirmation) — v1.5
+- ✓ FORGET safety guards (10+ char min, 50%+ content overlap) — v1.5
+- ✓ Per-response intent caps (5/3/1/3) with content deduplication — v1.5
+- ✓ /soul content length cap (2000 chars) — v1.5
+- ✓ Memory entry count cap with eviction (100 facts, 50 goals) — v1.5
+- ✓ Filename sanitization allowlist ([a-zA-Z0-9._-]) — v1.5
+- ✓ Lock file atomic acquisition (no fallback overwrite) — v1.5
 
 ### Active
 
-- [ ] Edge Function caller authentication (service_role JWT verification)
-- [ ] Embed function fetches content from DB instead of trusting client
-- [ ] Context-aware intent allowlisting (disable CRON/FORGET in heartbeat/cron contexts)
-- [ ] User confirmation for agent-created cron jobs
-- [ ] FORGET matching threshold (min length + overlap)
-- [ ] Per-response intent count caps with deduplication
-- [ ] Search function input bounds (match_count, match_threshold)
-- [ ] Generic error responses in Edge Functions
-- [ ] /soul content length cap
-- [ ] Memory entry count cap with eviction
-- [ ] Filename sanitization allowlist
-- [ ] Lock file atomic acquisition (no fallback overwrite)
+(None — ready for next milestone)
 
 ### Out of Scope
 
@@ -72,19 +62,23 @@ Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactiv
 - Soul evolution sharing — Rafa-only observer
 - Evolution influenced by user ratings — future consideration
 - Soul evolution visualization — future consideration
+- RLS policies on Supabase tables — service role key bypasses RLS by design; auth gate is at Edge Function level
+- End-to-end encryption of memories — overkill for single-user; auth gate sufficient
+- Prompt injection detection model — context-aware allowlisting is pragmatic and effective
+- Rate limiting on Edge Functions — Supabase API gateway already rate-limits
 
 ## Context
 
-Shipped v1.4 with 3,804 LOC TypeScript in `src/relay.ts` + 2 Edge Functions + 7 migrations.
+Shipped v1.5 with 4,298 LOC TypeScript in `src/relay.ts` + 2 Edge Functions + 7 migrations.
 Tech stack: Bun, Grammy, Supabase, Claude CLI, Groq Whisper, ElevenLabs, croner, OpenAI Embeddings.
-5 milestones shipped (v1.0-v1.4), 22 phases, 45 plans executed over 7 days.
+6 milestones shipped (v1.0-v1.5), 25 phases, 51 plans executed over 8 days.
 
-Soul evolution system transforms static bot personality into a living, growing identity:
-- Compression pyramid keeps soul within 800-token budget
-- Daily reflection at midnight analyzes interactions and generates new soul version
-- Milestone moments anchor personality across evolution cycles
-- Full version history with rollback preserves safety net
-- Growth safeguards ensure upward trajectory
+Security posture after v1.5:
+- Edge Functions authenticated via service_role JWT
+- Intent system has 3-layer defense: context allowlists → per-response caps → input validation
+- Memory bounded with automatic eviction
+- All file operations use allowlist sanitization
+- Lock acquisition is truly atomic
 
 ## Constraints
 
@@ -116,6 +110,14 @@ Soul evolution system transforms static bot personality into a living, growing i
 | Rollback creates NEW version | Preserves full history, never deletes | ✓ Good — v1.4 |
 | Growth safeguards in evolution prompt | Five principles prevent personality drift | ✓ Good — v1.4 |
 | Warning-only regression validation | Logs regression but doesn't block save | ✓ Good — v1.4 |
+| Service_role JWT for Edge Function auth | Supabase client automatically sends it | ✓ Good — v1.5 |
+| DB-sourced content for embed function | Prevents content injection via client payload | ✓ Good — v1.5 |
+| Context-aware intent allowlists | Prevents prompt injection escalation in automated contexts | ✓ Good — v1.5 |
+| Agent cron jobs start disabled | Requires user approval, prevents self-replicating jobs | ✓ Good — v1.5 |
+| FORGET overlap threshold (50%) | Prevents mass deletion via vague search terms | ✓ Good — v1.5 |
+| Per-response intent caps | Prevents memory flooding in single response | ✓ Good — v1.5 |
+| Allowlist filename sanitization | Stricter than blacklist, handles null bytes | ✓ Good — v1.5 |
+| Atomic-only lock acquisition | Eliminates race condition, clean failure on contention | ✓ Good — v1.5 |
 
 ---
 
@@ -151,7 +153,13 @@ Soul evolution system transforms static bot personality into a living, growing i
 **Delivered:** 3-layer soul architecture, daily evolution engine, milestone moments, soul versioning & rollback, evolution controls, growth safeguards
 **Archive:** [Roadmap](milestones/v1.4-ROADMAP.md) | [Requirements](milestones/v1.4-REQUIREMENTS.md)
 
+### Milestone 1.5: Security Hardening
+**Goal:** Fix all 13 security vulnerabilities from full audit (4 HIGH, 9 MEDIUM) without breaking existing capabilities.
+**Status:** Complete (3 phases, shipped 2026-02-17)
+**Delivered:** Edge Function auth, context-aware intent allowlists, agent cron approval, FORGET safety guards, per-response intent caps, input hardening
+**Archive:** [Roadmap](milestones/v1.5-ROADMAP.md) | [Requirements](milestones/v1.5-REQUIREMENTS.md) | [Audit](milestones/v1.5-MILESTONE-AUDIT.md)
+
 </details>
 
 ---
-*Last updated: 2026-02-16 after v1.5 milestone started*
+*Last updated: 2026-02-17 after v1.5 milestone*
