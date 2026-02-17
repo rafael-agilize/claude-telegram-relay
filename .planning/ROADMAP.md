@@ -69,7 +69,7 @@
 
 - [x] **Phase 23: Edge Function Security** — Authenticated, validated, and hardened Edge Functions (completed 2026-02-17)
 - [x] **Phase 24: Intent Injection Defense** — Context-aware intent restrictions with user confirmation (completed 2026-02-17)
-- [ ] **Phase 25: Intent Validation + Input Hardening** — Validated intents, capped inputs, atomic locks
+- [x] **Phase 25: Intent Validation + Input Hardening** — Validated intents, capped inputs, atomic locks (completed 2026-02-17)
 
 ## Phase Details
 
@@ -149,7 +149,7 @@ Phases execute in numeric order: 23 → 24 → 25
 | 22. Growth Safeguards | v1.4 | 2/2 | Complete | 2026-02-16 |
 | 23. Edge Function Security | v1.5 | Complete    | 2026-02-17 | - |
 | 24. Intent Injection Defense | v1.5 | Complete    | 2026-02-17 | - |
-| 25. Intent Validation + Input Hardening | v1.5 | 0/2 | Not started | - |
+| 25. Intent Validation + Input Hardening | v1.5 | Complete    | 2026-02-17 | - |
 
 ---
 
