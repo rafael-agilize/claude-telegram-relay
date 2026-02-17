@@ -10,7 +10,7 @@
  * Run: bun run src/relay.ts
  */
 
-import { Bot, Context, InputFile } from "grammy";
+import { Bot, Context, InputFile, InlineKeyboard } from "grammy";
 import { spawn } from "bun";
 import { writeFile, mkdir, readFile, unlink, open, readdir } from "fs/promises";
 import { join, basename } from "path";
@@ -1041,7 +1041,8 @@ async function createCronJob(
   scheduleType: 'cron' | 'interval' | 'once',
   prompt: string,
   targetThreadId?: string,
-  source: 'user' | 'agent' | 'file' = 'user'
+  source: 'user' | 'agent' | 'file' = 'user',
+  initialEnabled: boolean = true
 ): Promise<CronJob | null> {
   if (!supabase) return null;
   try {
@@ -1053,7 +1054,7 @@ async function createCronJob(
         schedule_type: scheduleType,
         prompt,
         target_thread_id: targetThreadId || null,
-        enabled: true,
+        enabled: initialEnabled,
         source,
       })
       .select()
@@ -1064,14 +1065,16 @@ async function createCronJob(
       return null;
     }
 
-    // Compute initial next_run_at
+    // Compute initial next_run_at only if enabled
     const job = data as CronJob;
-    const nextRun = computeNextRun(job);
-    if (nextRun) {
-      await supabase
-        .from("cron_jobs")
-        .update({ next_run_at: nextRun })
-        .eq("id", job.id);
+    if (initialEnabled) {
+      const nextRun = computeNextRun(job);
+      if (nextRun) {
+        await supabase
+          .from("cron_jobs")
+          .update({ next_run_at: nextRun })
+          .eq("id", job.id);
+      }
     }
 
     return job;
@@ -1106,6 +1109,36 @@ async function deleteCronJob(jobId: string): Promise<boolean> {
   } catch (e) {
     console.error("deleteCronJob error:", e);
     return false;
+  }
+}
+
+function escapeMarkdown(text: string): string {
+  return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+}
+
+async function sendCronApprovalMessage(job: CronJob): Promise<void> {
+  try {
+    const keyboard = new InlineKeyboard()
+      .text("✅ Approve", `cron_approve:${job.id}`)
+      .text("❌ Reject", `cron_reject:${job.id}`);
+
+    const message = [
+      `🤖 *Agent wants to create a cron job:*`,
+      ``,
+      `*Name:* ${escapeMarkdown(job.name)}`,
+      `*Schedule:* \`${job.schedule}\` (${job.schedule_type})`,
+      `*Prompt:* ${escapeMarkdown(job.prompt.substring(0, 200))}`,
+      ``,
+      `_Job is paused until you approve._`,
+    ].join("\n");
+
+    // Send to authorized user's DM
+    await bot.api.sendMessage(parseInt(ALLOWED_USER_ID), message, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  } catch (err: any) {
+    console.error(`[CronApproval] Failed to send approval message for job ${job.id}:`, err.message);
   }
 }
 
@@ -2193,7 +2226,7 @@ async function processIntents(response: string, threadDbId?: string, context: In
     clean = clean.replace(match[0], "");
   }
 
-  // [CRON: schedule | prompt] — agent self-scheduling
+  // [CRON: schedule | prompt] — agent self-scheduling (requires approval)
   const cronMatches = response.matchAll(/\[CRON:\s*(.+?)\s*\|\s*(.+?)\]/gi);
   for (const match of cronMatches) {
     if (!allowed.has('CRON')) {
@@ -2206,16 +2239,20 @@ async function processIntents(response: string, threadDbId?: string, context: In
         const scheduleType = detectScheduleType(schedule);
         if (scheduleType) {
           const name = prompt.length <= 50 ? prompt : prompt.substring(0, 47) + "...";
-          const job = await createCronJob(name, schedule, scheduleType, prompt, threadDbId || undefined, "agent");
+          // Agent-created jobs start DISABLED — require user approval
+          const job = await createCronJob(name, schedule, scheduleType, prompt, threadDbId || undefined, "agent", false);
           if (job) {
-            console.log(`[Agent] Created cron job: "${name}" (${schedule})`);
-            await logEventV2("cron_created", `Agent created cron job: ${name}`, {
+            console.log(`[Agent] Created pending cron job: "${name}" (${schedule}) — awaiting approval`);
+            await logEventV2("cron_created", `Agent created cron job (pending approval): ${name}`, {
               job_id: job.id,
               schedule,
               schedule_type: scheduleType,
               prompt: prompt.substring(0, 100),
               source: "agent",
+              pending_approval: true,
             }, threadDbId);
+            // Send confirmation message to user
+            await sendCronApprovalMessage(job);
           }
         } else {
           console.warn(`[Agent] Invalid schedule in CRON intent: "${schedule}"`);
