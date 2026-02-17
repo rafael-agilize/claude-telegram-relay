@@ -2081,7 +2081,17 @@ async function sendHeartbeatToTelegram(message: string): Promise<void> {
   }
 }
 
-async function processIntents(response: string, threadDbId?: string): Promise<string> {
+// Intent context type for per-context allowlists
+type IntentContext = 'interactive' | 'heartbeat' | 'cron';
+
+// Per-context intent allowlists (heartbeat and cron exclude CRON and FORGET to prevent escalation)
+const INTENT_ALLOWLIST: Record<IntentContext, Set<string>> = {
+  interactive: new Set(['REMEMBER', 'FORGET', 'GOAL', 'DONE', 'CRON', 'VOICE_REPLY', 'MILESTONE']),
+  heartbeat: new Set(['REMEMBER', 'GOAL', 'DONE', 'VOICE_REPLY', 'MILESTONE']),
+  cron: new Set(['REMEMBER', 'GOAL', 'DONE', 'VOICE_REPLY', 'MILESTONE']),
+};
+
+async function processIntents(response: string, threadDbId?: string, context: IntentContext = 'interactive'): Promise<string> {
   let clean = response;
   const failures: string[] = [];
 
@@ -2091,22 +2101,29 @@ async function processIntents(response: string, threadDbId?: string): Promise<st
     console.log(`[Intents] Detected intent tags in response (${response.length} chars)`);
   }
 
+  // Get the allowlist for this context
+  const allowed = INTENT_ALLOWLIST[context];
+
   // [REMEMBER: concise fact about the user]
   const rememberMatches = response.matchAll(/\[REMEMBER:\s*(.+?)\]/gi);
   for (const match of rememberMatches) {
-    const fact = match[1].trim();
-    // Security: cap fact length to prevent memory abuse
-    if (fact.length > 0 && fact.length <= 200) {
-      const ok = await insertMemory(fact, "fact", threadDbId);
-      if (ok) {
-        console.log(`Remembered: ${fact}`);
-      } else {
-        console.warn(`[Intents] REMEMBER failed to insert: ${fact}`);
-        failures.push(`Failed to save: "${fact}"`);
-      }
+    if (!allowed.has('REMEMBER')) {
+      console.warn(`[Intents] Blocked REMEMBER intent in '${context}' context: ${match[1].trim().substring(0, 50)}`);
     } else {
-      console.warn(`Rejected REMEMBER fact: too long (${fact.length} chars)`);
-      failures.push(`Rejected fact (too long): "${fact.substring(0, 50)}..."`);
+      const fact = match[1].trim();
+      // Security: cap fact length to prevent memory abuse
+      if (fact.length > 0 && fact.length <= 200) {
+        const ok = await insertMemory(fact, "fact", threadDbId);
+        if (ok) {
+          console.log(`Remembered: ${fact}`);
+        } else {
+          console.warn(`[Intents] REMEMBER failed to insert: ${fact}`);
+          failures.push(`Failed to save: "${fact}"`);
+        }
+      } else {
+        console.warn(`Rejected REMEMBER fact: too long (${fact.length} chars)`);
+        failures.push(`Rejected fact (too long): "${fact.substring(0, 50)}..."`);
+      }
     }
     clean = clean.replace(match[0], "");
   }
@@ -2116,20 +2133,24 @@ async function processIntents(response: string, threadDbId?: string): Promise<st
     /\[GOAL:\s*(.+?)(?:\s*\|\s*DEADLINE:\s*(.+?))?\]/gi
   );
   for (const match of goalMatches) {
-    const goalText = match[1].trim();
-    const deadline = match[2]?.trim() || null;
-    if (goalText.length > 0 && goalText.length <= 200) {
-      const ok = await insertMemory(goalText, "goal", threadDbId, deadline);
-      if (ok) {
-        console.log(
-          `Goal set: ${goalText}${deadline ? ` (deadline: ${deadline})` : ""}`
-        );
-      } else {
-        console.warn(`[Intents] GOAL failed to insert: ${goalText}`);
-        failures.push(`Failed to save goal: "${goalText}"`);
+    if (!allowed.has('GOAL')) {
+      console.warn(`[Intents] Blocked GOAL intent in '${context}' context: ${match[1].trim().substring(0, 50)}`);
+    } else {
+      const goalText = match[1].trim();
+      const deadline = match[2]?.trim() || null;
+      if (goalText.length > 0 && goalText.length <= 200) {
+        const ok = await insertMemory(goalText, "goal", threadDbId, deadline);
+        if (ok) {
+          console.log(
+            `Goal set: ${goalText}${deadline ? ` (deadline: ${deadline})` : ""}`
+          );
+        } else {
+          console.warn(`[Intents] GOAL failed to insert: ${goalText}`);
+          failures.push(`Failed to save goal: "${goalText}"`);
+        }
+      } else if (goalText.length > 200) {
+        console.warn(`Rejected GOAL: too long (${goalText.length} chars)`);
       }
-    } else if (goalText.length > 200) {
-      console.warn(`Rejected GOAL: too long (${goalText.length} chars)`);
     }
     clean = clean.replace(match[0], "");
   }
@@ -2137,14 +2158,18 @@ async function processIntents(response: string, threadDbId?: string): Promise<st
   // [DONE: search text to mark a goal as completed]
   const doneMatches = response.matchAll(/\[DONE:\s*(.+?)\]/gi);
   for (const match of doneMatches) {
-    const searchText = match[1].trim();
-    if (searchText.length > 0 && searchText.length <= 200) {
-      const completed = await completeGoal(searchText);
-      if (completed) {
-        console.log(`Goal completed matching: ${searchText}`);
-      } else {
-        console.warn(`[Intents] DONE failed: no active goal matching "${searchText}"`);
-        failures.push(`No active goal found matching: "${searchText}"`);
+    if (!allowed.has('DONE')) {
+      console.warn(`[Intents] Blocked DONE intent in '${context}' context: ${match[1].trim().substring(0, 50)}`);
+    } else {
+      const searchText = match[1].trim();
+      if (searchText.length > 0 && searchText.length <= 200) {
+        const completed = await completeGoal(searchText);
+        if (completed) {
+          console.log(`Goal completed matching: ${searchText}`);
+        } else {
+          console.warn(`[Intents] DONE failed: no active goal matching "${searchText}"`);
+          failures.push(`No active goal found matching: "${searchText}"`);
+        }
       }
     }
     clean = clean.replace(match[0], "");
@@ -2153,13 +2178,17 @@ async function processIntents(response: string, threadDbId?: string): Promise<st
   // [FORGET: search text to remove a fact]
   const forgetMatches = response.matchAll(/\[FORGET:\s*(.+?)\]/gi);
   for (const match of forgetMatches) {
-    const searchText = match[1].trim();
-    const deleted = await deleteMemory(searchText);
-    if (deleted) {
-      console.log(`Forgot memory matching: ${searchText}`);
+    if (!allowed.has('FORGET')) {
+      console.warn(`[Intents] Blocked FORGET intent in '${context}' context: ${match[1].trim().substring(0, 50)}`);
     } else {
-      console.warn(`[Intents] FORGET failed: no match for "${searchText}"`);
-      failures.push(`Could not find memory matching: "${searchText}"`);
+      const searchText = match[1].trim();
+      const deleted = await deleteMemory(searchText);
+      if (deleted) {
+        console.log(`Forgot memory matching: ${searchText}`);
+      } else {
+        console.warn(`[Intents] FORGET failed: no match for "${searchText}"`);
+        failures.push(`Could not find memory matching: "${searchText}"`);
+      }
     }
     clean = clean.replace(match[0], "");
   }
@@ -2167,29 +2196,33 @@ async function processIntents(response: string, threadDbId?: string): Promise<st
   // [CRON: schedule | prompt] — agent self-scheduling
   const cronMatches = response.matchAll(/\[CRON:\s*(.+?)\s*\|\s*(.+?)\]/gi);
   for (const match of cronMatches) {
-    const schedule = match[1].trim();
-    const prompt = match[2].trim();
+    if (!allowed.has('CRON')) {
+      console.warn(`[Intents] Blocked CRON intent in '${context}' context: ${match[1].trim().substring(0, 50)}`);
+    } else {
+      const schedule = match[1].trim();
+      const prompt = match[2].trim();
 
-    if (schedule.length > 0 && prompt.length > 0 && prompt.length <= 500) {
-      const scheduleType = detectScheduleType(schedule);
-      if (scheduleType) {
-        const name = prompt.length <= 50 ? prompt : prompt.substring(0, 47) + "...";
-        const job = await createCronJob(name, schedule, scheduleType, prompt, threadDbId || undefined, "agent");
-        if (job) {
-          console.log(`[Agent] Created cron job: "${name}" (${schedule})`);
-          await logEventV2("cron_created", `Agent created cron job: ${name}`, {
-            job_id: job.id,
-            schedule,
-            schedule_type: scheduleType,
-            prompt: prompt.substring(0, 100),
-            source: "agent",
-          }, threadDbId);
+      if (schedule.length > 0 && prompt.length > 0 && prompt.length <= 500) {
+        const scheduleType = detectScheduleType(schedule);
+        if (scheduleType) {
+          const name = prompt.length <= 50 ? prompt : prompt.substring(0, 47) + "...";
+          const job = await createCronJob(name, schedule, scheduleType, prompt, threadDbId || undefined, "agent");
+          if (job) {
+            console.log(`[Agent] Created cron job: "${name}" (${schedule})`);
+            await logEventV2("cron_created", `Agent created cron job: ${name}`, {
+              job_id: job.id,
+              schedule,
+              schedule_type: scheduleType,
+              prompt: prompt.substring(0, 100),
+              source: "agent",
+            }, threadDbId);
+          }
+        } else {
+          console.warn(`[Agent] Invalid schedule in CRON intent: "${schedule}"`);
         }
       } else {
-        console.warn(`[Agent] Invalid schedule in CRON intent: "${schedule}"`);
+        console.warn(`[Agent] Rejected CRON intent: schedule="${schedule}" prompt length=${prompt.length}`);
       }
-    } else {
-      console.warn(`[Agent] Rejected CRON intent: schedule="${schedule}" prompt length=${prompt.length}`);
     }
     clean = clean.replace(match[0], "");
   }
@@ -2199,24 +2232,28 @@ async function processIntents(response: string, threadDbId?: string): Promise<st
     /\[MILESTONE:\s*(.+?)(?:\s*\|\s*WEIGHT:\s*(formative|meaningful|challenging))?(?:\s*\|\s*LESSON:\s*(.+?))?\]/gi
   );
   for (const match of milestoneMatches) {
-    const eventDesc = match[1].trim();
-    const weight = match[2]?.trim().toLowerCase() || "meaningful";
-    const lesson = match[3]?.trim() || "";
-    if (eventDesc.length > 0 && eventDesc.length <= 300) {
-      const ok = await saveMilestone(eventDesc, weight, lesson, threadDbId);
-      if (ok) {
-        console.log(`Milestone saved: [${weight}] ${eventDesc}`);
-        await logEventV2("milestone_saved", `Milestone: ${eventDesc}`, {
-          emotional_weight: weight,
-          lesson_learned: lesson.substring(0, 100),
-        }, threadDbId);
-      } else {
-        console.warn(`[Intents] MILESTONE failed to save: ${eventDesc}`);
-        failures.push(`Failed to save milestone: "${eventDesc.substring(0, 50)}..."`);
+    if (!allowed.has('MILESTONE')) {
+      console.warn(`[Intents] Blocked MILESTONE intent in '${context}' context: ${match[1].trim().substring(0, 50)}`);
+    } else {
+      const eventDesc = match[1].trim();
+      const weight = match[2]?.trim().toLowerCase() || "meaningful";
+      const lesson = match[3]?.trim() || "";
+      if (eventDesc.length > 0 && eventDesc.length <= 300) {
+        const ok = await saveMilestone(eventDesc, weight, lesson, threadDbId);
+        if (ok) {
+          console.log(`Milestone saved: [${weight}] ${eventDesc}`);
+          await logEventV2("milestone_saved", `Milestone: ${eventDesc}`, {
+            emotional_weight: weight,
+            lesson_learned: lesson.substring(0, 100),
+          }, threadDbId);
+        } else {
+          console.warn(`[Intents] MILESTONE failed to save: ${eventDesc}`);
+          failures.push(`Failed to save milestone: "${eventDesc.substring(0, 50)}..."`);
+        }
+      } else if (eventDesc.length > 300) {
+        console.warn(`Rejected MILESTONE: too long (${eventDesc.length} chars)`);
+        failures.push(`Rejected milestone (too long): "${eventDesc.substring(0, 50)}..."`);
       }
-    } else if (eventDesc.length > 300) {
-      console.warn(`Rejected MILESTONE: too long (${eventDesc.length} chars)`);
-      failures.push(`Rejected milestone (too long): "${eventDesc.substring(0, 50)}..."`);
     }
     clean = clean.replace(match[0], "");
   }
