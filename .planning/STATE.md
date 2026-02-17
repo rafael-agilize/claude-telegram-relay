@@ -2,26 +2,26 @@
 
 ## Current Position
 
-Phase: 23 of 25 (Edge Function Security)
-Plan: 02 of 02
+Phase: 24 of 25 (Intent Injection Defense)
+Plan: 01 of 01
 Status: Complete
-Last activity: 2026-02-17 — Completed 23-02 Edge Function input validation and parameter clamping
+Last activity: 2026-02-17 — Completed 24-01 Intent injection defense with context-aware allowlists
 
-Progress: [████████████████████████████████████████████░░░░] 92% (47/51 plans estimated)
+Progress: [████████████████████████████████████████████░░░░] 94% (48/51 plans estimated)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, semantic search, real-time feedback, and self-evolving personality
-**Current focus:** Phase 23 - Edge Function Security (v1.5 Security Hardening)
+**Current focus:** Phase 24 - Intent Injection Defense (v1.5 Security Hardening)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 47 (across v1.0-v1.5)
-- Average duration: ~24 min
-- Total execution time: ~19.2 hours
+- Total plans completed: 48 (across v1.0-v1.5)
+- Average duration: ~23 min
+- Total execution time: ~19.3 hours
 
 **By Milestone:**
 
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 | v1.2 Streaming | 12-13 | 4/4 | Complete 2026-02-13 |
 | v1.3 Smart Memory | 14-16 | 7/7 | Complete 2026-02-13 |
 | v1.4 Soul Evolution | 17-22 | 12/12 | Complete 2026-02-16 |
-| v1.5 Security Hardening | 23-25 | 2/6 | In Progress |
+| v1.5 Security Hardening | 23-25 | 3/6 | In Progress |
 
 ## Accumulated Context
 
@@ -48,6 +48,8 @@ Recent decisions affecting current work:
 - Phase 16: OpenAI embeddings via Edge Functions (keeps API key in Supabase secrets)
 - [Phase 23-02]: Embed function fetches content from database by row ID only (prevents content injection)
 - [Phase 23-02]: Search function clamps match_count to [1,20] and match_threshold to [0.5,1.0]
+- [Phase 24-01]: Heartbeat and cron contexts exclude CRON and FORGET intents (prevents self-replicating jobs and memory deletion)
+- [Phase 24-01]: Blocked intents are stripped from response but not executed (silent blocking with warning logs)
 
 ### Pending Todos
 
@@ -59,8 +61,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-02-17 — Completed 23-02-PLAN.md (Edge Function input validation)
-**Next action:** Plan next phase (Phase 24 or continue v1.5)
+**Last session:** 2026-02-17 — Completed 24-01-PLAN.md (Intent injection defense)
+**Next action:** Plan next phase (Phase 25 or continue v1.5)
 **Resume file:** None
 
 ---
