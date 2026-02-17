@@ -96,11 +96,11 @@ Plans:
   1. Heartbeat and cron contexts cannot create new cron jobs or delete memories
   2. Agent-created cron jobs require user approval before activation
   3. processIntents() enforces context-specific allowlists (interactive allows all, heartbeat/cron restricted)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 24-01: TBD
-- [ ] 24-02: TBD
+- [ ] 24-01-PLAN.md — Context-aware intent allowlists in processIntents() (INTENT-01, INTENT-02)
+- [ ] 24-02-PLAN.md — Agent cron confirmation flow with inline buttons (INTENT-03)
 
 ### Phase 25: Intent Validation + Input Hardening
 **Goal**: Validated intents, capped inputs, atomic locks
