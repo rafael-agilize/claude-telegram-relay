@@ -391,12 +391,23 @@ async function insertMemory(
   }
 }
 
+function contentOverlap(searchText: string, content: string): number {
+  const searchWords = new Set(searchText.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+  const contentWords = new Set(content.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+  if (searchWords.size === 0) return 0;
+  let matches = 0;
+  for (const word of searchWords) {
+    if (contentWords.has(word)) matches++;
+  }
+  return matches / searchWords.size;
+}
+
 async function deleteMemory(searchText: string): Promise<boolean> {
   if (!supabase) {
     console.warn("deleteMemory: no supabase client");
     return false;
   }
-  if (!searchText || searchText.length > 200) {
+  if (!searchText || searchText.length < 10 || searchText.length > 200) {
     console.warn(`deleteMemory: invalid search text (length=${searchText?.length || 0})`);
     return false;
   }
@@ -414,6 +425,11 @@ async function deleteMemory(searchText: string): Promise<boolean> {
       m.content.toLowerCase().includes(searchText.toLowerCase())
     );
     if (match) {
+      const overlap = contentOverlap(searchText, match.content);
+      if (overlap < 0.5) {
+        console.warn(`deleteMemory: low overlap (${overlap.toFixed(2)}) for "${searchText}" vs "${match.content.substring(0, 50)}"`);
+        return false;
+      }
       await supabase.from("global_memory").delete().eq("id", match.id);
       console.log(`Forgot memory [${(match as any).type}]: ${match.content}`);
       return true;
@@ -2215,12 +2231,17 @@ async function processIntents(response: string, threadDbId?: string, context: In
       console.warn(`[Intents] Blocked FORGET intent in '${context}' context: ${match[1].trim().substring(0, 50)}`);
     } else {
       const searchText = match[1].trim();
-      const deleted = await deleteMemory(searchText);
-      if (deleted) {
-        console.log(`Forgot memory matching: ${searchText}`);
+      if (searchText.length < 10) {
+        console.warn(`[Intents] Rejected FORGET: search text too short (${searchText.length} chars)`);
+        failures.push(`FORGET search too short: "${searchText}"`);
       } else {
-        console.warn(`[Intents] FORGET failed: no match for "${searchText}"`);
-        failures.push(`Could not find memory matching: "${searchText}"`);
+        const deleted = await deleteMemory(searchText);
+        if (deleted) {
+          console.log(`Forgot memory matching: ${searchText}`);
+        } else {
+          console.warn(`[Intents] FORGET failed: no match for "${searchText}"`);
+          failures.push(`Could not find memory matching: "${searchText}"`);
+        }
       }
     }
     clean = clean.replace(match[0], "");
