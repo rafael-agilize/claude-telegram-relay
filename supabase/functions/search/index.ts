@@ -12,6 +12,16 @@ Deno.serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
+  // Auth guard: verify service_role JWT
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ") || authHeader.split(" ")[1] !== Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
+    console.warn("Unauthorized request to search function");
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   try {
     const body = await req.json();
     const query = body.query;
