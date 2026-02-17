@@ -25,8 +25,6 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const query = body.query;
-    const matchCount = body.match_count ?? 5;
-    const matchThreshold = body.match_threshold ?? 0.7;
 
     if (!query || typeof query !== "string") {
       return new Response(
@@ -34,6 +32,21 @@ Deno.serve(async (req) => {
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
+
+    // EDGE-03: Query length limit to prevent abuse
+    if (query.length > 1000) {
+      return new Response(
+        JSON.stringify({ error: "Query too long" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const rawMatchCount = body.match_count ?? 5;
+    const rawMatchThreshold = body.match_threshold ?? 0.7;
+
+    // EDGE-03: Clamp parameters to safe bounds
+    const matchCount = Math.min(Math.max(Math.round(rawMatchCount), 1), 20);
+    const matchThreshold = Math.max(Math.min(rawMatchThreshold, 1.0), 0.5);
 
     // Generate embedding for the query
     const embeddingResponse = await fetch(
