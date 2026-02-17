@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 23 of 25 (Edge Function Security)
-Plan: 01 of 02
-Status: Ready to plan
-Last activity: 2026-02-17 — Completed 23-01 Edge Function authentication and error sanitization
+Plan: 02 of 02
+Status: Complete
+Last activity: 2026-02-17 — Completed 23-02 Edge Function input validation and parameter clamping
 
-Progress: [████████████████████████████████████████████░░░░] 90% (46/51 plans estimated)
+Progress: [████████████████████████████████████████████░░░░] 92% (47/51 plans estimated)
 
 ## Project Reference
 
@@ -19,9 +19,9 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 46 (across v1.0-v1.5)
+- Total plans completed: 47 (across v1.0-v1.5)
 - Average duration: ~24 min
-- Total execution time: ~18.9 hours
+- Total execution time: ~19.2 hours
 
 **By Milestone:**
 
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 | v1.2 Streaming | 12-13 | 4/4 | Complete 2026-02-13 |
 | v1.3 Smart Memory | 14-16 | 7/7 | Complete 2026-02-13 |
 | v1.4 Soul Evolution | 17-22 | 12/12 | Complete 2026-02-16 |
-| v1.5 Security Hardening | 23-25 | 1/6 | In Progress |
+| v1.5 Security Hardening | 23-25 | 2/6 | In Progress |
 
 ## Accumulated Context
 
@@ -46,6 +46,8 @@ Recent decisions affecting current work:
 - Phase 22: Warning-only regression validation (logs regression but doesn't block save)
 - Phase 19: Daily evolution without approval (Rafa observes via reports, bot has full autonomy)
 - Phase 16: OpenAI embeddings via Edge Functions (keeps API key in Supabase secrets)
+- [Phase 23-02]: Embed function fetches content from database by row ID only (prevents content injection)
+- [Phase 23-02]: Search function clamps match_count to [1,20] and match_threshold to [0.5,1.0]
 
 ### Pending Todos
 
@@ -57,8 +59,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-02-17 — Completed 23-01-PLAN.md (Edge Function Security)
-**Next action:** Execute 23-02 (Rate Limiting)
+**Last session:** 2026-02-17 — Completed 23-02-PLAN.md (Edge Function input validation)
+**Next action:** Plan next phase (Phase 24 or continue v1.5)
 **Resume file:** None
 
 ---
