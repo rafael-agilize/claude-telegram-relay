@@ -1343,8 +1343,8 @@ async function executeCronJob(job: CronJob): Promise<void> {
     await updateThreadSession(threadInfo.dbId, sessionId);
   }
 
-  // Process intents
-  const cleanResponse = await processIntents(text, threadInfo?.dbId);
+  // Process intents (cron context prevents CRON and FORGET intents)
+  const cleanResponse = await processIntents(text, threadInfo?.dbId, 'cron');
 
   // Strip voice tags
   const finalMessage = cleanResponse.replace(/\[VOICE_REPLY\]/gi, "").trim();
@@ -1494,8 +1494,8 @@ async function heartbeatTick(): Promise<void> {
       return;
     }
 
-    // Step 4: Process intents ([REMEMBER:], [FORGET:], [GOAL:], [DONE:])
-    const cleanResponse = await processIntents(rawResponse);
+    // Step 4: Process intents (heartbeat context prevents CRON and FORGET intents)
+    const cleanResponse = await processIntents(rawResponse, undefined, 'heartbeat');
 
     // Strip [VOICE_REPLY] tag if Claude included it despite instructions
     const finalMessage = cleanResponse.replace(/\[VOICE_REPLY\]/gi, "").trim();
@@ -3369,7 +3369,7 @@ bot.on("message:text", async (ctx) => {
 
     const enrichedPrompt = await buildPrompt(text, ctx.threadInfo);
     const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
-    const response = await processIntents(rawResponse, ctx.threadInfo?.dbId);
+    const response = await processIntents(rawResponse, ctx.threadInfo?.dbId, 'interactive');
 
     // Check if Claude included [VOICE_REPLY] tag
     const wantsVoice = /\[VOICE_REPLY\]/i.test(response);
@@ -3427,7 +3427,7 @@ bot.on("message:voice", async (ctx) => {
 
     const enrichedPrompt = await buildPrompt(transcription, ctx.threadInfo);
     const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
-    const claudeResponse = await processIntents(rawResponse, ctx.threadInfo?.dbId);
+    const claudeResponse = await processIntents(rawResponse, ctx.threadInfo?.dbId, 'interactive');
 
     // V2 thread-aware logging
     if (ctx.threadInfo) {
@@ -3480,7 +3480,7 @@ bot.on("message:photo", async (ctx) => {
     const caption = ctx.message.caption || "Analyze this image.";
     const enrichedPrompt = await buildPrompt(`[Image: ${filePath}]\n\n${caption}`, ctx.threadInfo);
     const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
-    const claudeResponse = await processIntents(rawResponse, ctx.threadInfo?.dbId);
+    const claudeResponse = await processIntents(rawResponse, ctx.threadInfo?.dbId, 'interactive');
 
     await unlink(filePath).catch(() => {});
 
@@ -3523,7 +3523,7 @@ bot.on("message:document", async (ctx) => {
     const caption = ctx.message.caption || `Analyze: ${doc.file_name}`;
     const enrichedPrompt = await buildPrompt(`[File: ${filePath}]\n\n${caption}`, ctx.threadInfo);
     const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
-    const claudeResponse = await processIntents(rawResponse, ctx.threadInfo?.dbId);
+    const claudeResponse = await processIntents(rawResponse, ctx.threadInfo?.dbId, 'interactive');
 
     await unlink(filePath).catch(() => {});
 
