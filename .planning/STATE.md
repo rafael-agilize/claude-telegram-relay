@@ -2,24 +2,24 @@
 
 ## Current Position
 
-Phase: 24 of 25 (Intent Injection Defense)
-Plan: 02 of 02
+Phase: 25 of 25 (Intent Validation & Input Hardening)
+Plan: 01 of 02
 Status: Complete
-Last activity: 2026-02-17 — Completed 24-02 Cron job approval flow with InlineKeyboard
+Last activity: 2026-02-17 — Completed 25-01 Intent validation with FORGET guards and per-response caps
 
-Progress: [████████████████████████████████████████████░░░░] 96% (49/51 plans estimated)
+Progress: [█████████████████████████████████████████████░░░] 98% (50/51 plans estimated)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Full-featured Telegram relay to Claude Code CLI with streaming, memory, proactive agent, semantic search, real-time feedback, and self-evolving personality
-**Current focus:** Phase 24 - Intent Injection Defense (v1.5 Security Hardening)
+**Current focus:** Phase 25 - Intent Validation & Input Hardening (v1.5 Security Hardening)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 49 (across v1.0-v1.5)
+- Total plans completed: 50 (across v1.0-v1.5)
 - Average duration: ~22 min
 - Total execution time: ~18.1 hours
 
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 | v1.2 Streaming | 12-13 | 4/4 | Complete 2026-02-13 |
 | v1.3 Smart Memory | 14-16 | 7/7 | Complete 2026-02-13 |
 | v1.4 Soul Evolution | 17-22 | 12/12 | Complete 2026-02-16 |
-| v1.5 Security Hardening | 23-25 | 4/6 | In Progress |
+| v1.5 Security Hardening | 23-25 | 5/6 | In Progress |
 
 ## Accumulated Context
 
@@ -52,6 +52,9 @@ Recent decisions affecting current work:
 - [Phase 24-01]: Blocked intents are stripped from response but not executed (silent blocking with warning logs)
 - [Phase 24-02]: Agent-created cron jobs start disabled and require user approval via InlineKeyboard buttons
 - [Phase 24-02]: User/file-sourced cron jobs remain immediately active (unchanged behavior)
+- [Phase 25-01]: FORGET requires 10+ char search text and >50% word overlap (prevents mass deletion)
+- [Phase 25-01]: Per-response caps: 5 REMEMBER, 3 GOAL, 1 CRON, 3 FORGET (prevents flooding)
+- [Phase 25-01]: REMEMBER/GOAL deduplicated within same response via normalized content Set
 
 ### Pending Todos
 
@@ -63,8 +66,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-02-17 — Completed 24-02-PLAN.md (Cron job approval flow)
-**Next action:** Plan next phase (Phase 25 or continue v1.5)
+**Last session:** 2026-02-17 — Completed 25-01-PLAN.md (Intent validation & input hardening)
+**Next action:** Continue to Phase 25 Plan 02 (if exists)
 **Resume file:** None
 
 ---
