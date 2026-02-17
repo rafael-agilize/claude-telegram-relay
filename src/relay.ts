@@ -63,7 +63,10 @@ const UPLOADS_DIR = join(RELAY_DIR, "uploads");
 
 // Security: sanitize filenames to prevent path traversal
 function sanitizeFilename(name: string): string {
-  return name.replace(/[\/\\]/g, "_").replace(/\.\./g, "_");
+  // Strip null bytes first
+  const clean = name.replace(/\0/g, "");
+  // Allowlist: only keep alphanumeric, dots, hyphens, underscores
+  return clean.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
 // Claude CLI limits
@@ -354,6 +357,9 @@ async function getMemoryContext(): Promise<string[]> {
   }
 }
 
+const MAX_FACTS = 100;
+const MAX_GOALS = 50;
+
 async function insertMemory(
   content: string,
   type: string = "fact",
@@ -362,6 +368,11 @@ async function insertMemory(
   priority?: number
 ): Promise<boolean> {
   if (!supabase) return false;
+
+  const typeLimit = type === "fact" ? MAX_FACTS : type === "goal" ? MAX_GOALS : null;
+  if (typeLimit !== null) {
+    await evictOldestMemory(type, typeLimit);
+  }
   try {
     const row: Record<string, unknown> = {
       content,
@@ -388,6 +399,34 @@ async function insertMemory(
   } catch (e) {
     console.error("insertMemory error:", e);
     return false;
+  }
+}
+
+async function evictOldestMemory(type: string, maxCount: number): Promise<void> {
+  if (!supabase) return;
+  try {
+    const { count } = await supabase
+      .from("global_memory")
+      .select("id", { count: "exact", head: true })
+      .eq("type", type);
+
+    if (count !== null && count >= maxCount) {
+      const excess = count - maxCount + 1; // Make room for new entry
+      const { data: oldest } = await supabase
+        .from("global_memory")
+        .select("id")
+        .eq("type", type)
+        .order("created_at", { ascending: true })
+        .limit(excess);
+
+      if (oldest && oldest.length > 0) {
+        const ids = oldest.map((r: { id: string }) => r.id);
+        await supabase.from("global_memory").delete().in("id", ids);
+        console.log(`[Memory] Evicted ${ids.length} oldest ${type}(s) to stay under ${maxCount} cap`);
+      }
+    }
+  } catch (e) {
+    console.error(`evictOldestMemory error (${type}):`, e);
   }
 }
 
@@ -3189,6 +3228,11 @@ bot.command("soul", async (ctx) => {
   }
 
   // Default: set soul personality
+  if (args.length > 2000) {
+    await ctx.reply(`Soul text too long (${args.length} chars). Maximum is 2000 characters.`);
+    return;
+  }
+
   const success = await setSoul(args);
   if (success) {
     await logEventV2("soul_updated", args.substring(0, 100), {}, ctx.threadInfo?.dbId);
