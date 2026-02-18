@@ -4063,22 +4063,41 @@ process.on("unhandledRejection", (reason) => {
   logEventV2("unhandled_rejection", String(reason).substring(0, 200)).catch(() => {});
 });
 
-bot.start({
-  onStart: async () => {
-    console.log("Bot is running!");
+// Resilient polling — auto-restarts if Grammy's polling loop crashes (e.g. 409 conflict)
+let servicesStarted = false;
+const startBot = async () => {
+  while (true) {
+    try {
+      await bot.start({
+        drop_pending_updates: !servicesStarted, // only drop on restarts to avoid re-processing
+        onStart: async () => {
+          console.log("Bot is running!");
 
-    // Start heartbeat timer from Supabase config
-    const hbConfig = await getHeartbeatConfig();
-    if (hbConfig?.enabled) {
-      startHeartbeat(hbConfig.interval_minutes);
-    } else {
-      console.log("Heartbeat: disabled (no config or not enabled)");
+          if (!servicesStarted) {
+            servicesStarted = true;
+
+            // Start heartbeat timer from Supabase config
+            const hbConfig = await getHeartbeatConfig();
+            if (hbConfig?.enabled) {
+              startHeartbeat(hbConfig.interval_minutes);
+            } else {
+              console.log("Heartbeat: disabled (no config or not enabled)");
+            }
+
+            // Start cron scheduler
+            startCronScheduler();
+
+            // Start evolution timer
+            startEvolutionTimer();
+          }
+        },
+      });
+    } catch (err: any) {
+      console.error(`Polling crashed: ${err.message || err}. Restarting in 5s...`);
+      logEventV2("polling_crash", String(err.message || err).substring(0, 200)).catch(() => {});
+      await new Promise((r) => setTimeout(r, 5000));
     }
+  }
+};
 
-    // Start cron scheduler
-    startCronScheduler();
-
-    // Start evolution timer
-    startEvolutionTimer();
-  },
-});
+startBot();
