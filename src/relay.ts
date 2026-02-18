@@ -2797,12 +2797,20 @@ function createLivenessReporter(
 // CORE: Call Claude CLI
 // ============================================================
 
+const DEFAULT_MODEL = "claude-sonnet-4-6";
+const OPUS_MODEL = "claude-opus-4-6";
+
+function pickModel(userText: string): string {
+  return /opus/i.test(userText) ? OPUS_MODEL : DEFAULT_MODEL;
+}
+
 async function callClaude(
   prompt: string,
   threadInfo?: ThreadInfo,
-  onStreamEvent?: (event: any) => void
+  onStreamEvent?: (event: any) => void,
+  model: string = "claude-sonnet-4-6"
 ): Promise<{ text: string; sessionId: string | null }> {
-  const args = [CLAUDE_PATH, "-p", prompt];
+  const args = [CLAUDE_PATH, "-p", prompt, "--model", model];
 
   // Resume from thread's stored session if available
   if (threadInfo?.sessionId) {
@@ -2811,7 +2819,7 @@ async function callClaude(
 
   args.push("--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions");
 
-  console.log(`Calling Claude: ${prompt.substring(0, 80)}...`);
+  console.log(`Calling Claude (${model}): ${prompt.substring(0, 80)}...`);
 
   try {
     const proc = spawn(args, {
@@ -3001,7 +3009,7 @@ async function callClaude(
       // If we used --resume and it failed, retry without it (session may be expired/corrupt)
       if (threadInfo?.sessionId) {
         console.warn(`Session ${threadInfo.sessionId} failed (exit ${exitCode}), starting fresh`);
-        return callClaude(prompt, { ...threadInfo, sessionId: null }, onStreamEvent);
+        return callClaude(prompt, { ...threadInfo, sessionId: null }, onStreamEvent, model);
       }
       console.error("Claude error:", stderrText);
       return { text: "Sorry, something went wrong processing your request. Please try again.", sessionId: null };
@@ -3497,7 +3505,7 @@ bot.on("message:text", async (ctx) => {
     await ctx.replyWithChatAction("typing");
 
     const enrichedPrompt = await buildPrompt(text, ctx.threadInfo);
-    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
+    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent, pickModel(text));
     const response = await processIntents(rawResponse, ctx.threadInfo?.dbId, 'interactive');
 
     // Check if Claude included [VOICE_REPLY] tag
@@ -3555,7 +3563,7 @@ bot.on("message:voice", async (ctx) => {
     console.log(`Transcription: ${transcription.substring(0, 80)}...`);
 
     const enrichedPrompt = await buildPrompt(transcription, ctx.threadInfo);
-    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
+    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent, pickModel(transcription));
     const claudeResponse = await processIntents(rawResponse, ctx.threadInfo?.dbId, 'interactive');
 
     // V2 thread-aware logging
@@ -3608,7 +3616,7 @@ bot.on("message:photo", async (ctx) => {
 
     const caption = ctx.message.caption || "Analyze this image.";
     const enrichedPrompt = await buildPrompt(`[Image: ${filePath}]\n\n${caption}`, ctx.threadInfo);
-    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
+    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent, pickModel(caption));
     const claudeResponse = await processIntents(rawResponse, ctx.threadInfo?.dbId, 'interactive');
 
     await unlink(filePath).catch(() => {});
@@ -3735,7 +3743,7 @@ bot.on("message:document", async (ctx) => {
 
     const caption = ctx.message.caption || `Analyze: ${doc.file_name}`;
     const enrichedPrompt = await buildPrompt(`[File: ${filePath}]\n\n${caption}`, ctx.threadInfo);
-    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent);
+    const { text: rawResponse } = await callClaude(enrichedPrompt, ctx.threadInfo, liveness.onStreamEvent, pickModel(caption));
     const claudeResponse = await processIntents(rawResponse, ctx.threadInfo?.dbId, 'interactive');
 
     await unlink(filePath).catch(() => {});
