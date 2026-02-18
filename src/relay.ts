@@ -1671,7 +1671,22 @@ const EVOLUTION_HOUR = parseInt(process.env.EVOLUTION_HOUR || "0"); // 0 = midni
 const EVOLUTION_TIMEZONE = process.env.EVOLUTION_TIMEZONE || "America/Sao_Paulo";
 
 async function performDailyEvolution(): Promise<void> {
-  // Get last 24h messages
+  // Cheap count check: skip evolution if no conversations today (saves tokens)
+  if (supabase) {
+    const cutoffISO = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count, error } = await supabase
+      .from("thread_messages")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", cutoffISO);
+
+    if (!error && (count === null || count === 0)) {
+      console.log("Evolution: no interactions in last 24h, skipping (cheap count check)");
+      await logEventV2("evolution_skip", "No interactions in last 24h");
+      return;
+    }
+  }
+
+  // Get last 24h messages (only reached if count > 0)
   const messages = await getLast24hMessages();
   if (messages.length === 0) {
     console.log("Evolution: no interactions in last 24h, skipping");
