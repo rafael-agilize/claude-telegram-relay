@@ -71,7 +71,20 @@ function sanitizeFilename(name: string): string {
 
 // Claude CLI limits
 const CLAUDE_INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 min of no output = stuck
+const CLAUDE_ABSOLUTE_TIMEOUT_MS = 20 * 60 * 1000; // 20 min hard wall-clock cap per call
 const MAX_OUTPUT_SIZE = 1024 * 1024; // 1MB
+
+// Helper: race a promise against a wall-clock timeout.
+// Prevents automated ticks from hanging forever if callClaude or Supabase never resolves.
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(ms / 60000)}min (wall-clock)`)), ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
 
 // Kill orphaned child processes left behind after Claude CLI timeout.
 // Finds processes whose parent was the killed Claude process (now reparented to PID 1)
@@ -1465,6 +1478,8 @@ async function cronTick(): Promise<void> {
   cronRunning = true;
 
   try {
+    // Wall-clock timeout: prevent a stuck callClaude or Supabase call from blocking cron forever
+    await withTimeout((async () => {
     const jobs = await getEnabledCronJobs();
 
     if (jobs.length === 0) {
@@ -1501,6 +1516,7 @@ async function cronTick(): Promise<void> {
         console.error(`[Cron] Error executing job ${job.id}:`, err);
       }
     }
+    })(), CLAUDE_ABSOLUTE_TIMEOUT_MS, "Cron tick");
   } finally {
     cronRunning = false;
   }
@@ -1532,6 +1548,8 @@ async function heartbeatTick(): Promise<void> {
 
   heartbeatRunning = true;
   try {
+    // Wall-clock timeout: prevent a stuck callClaude or Supabase call from blocking heartbeat forever
+    await withTimeout((async () => {
     const config = await getHeartbeatConfig();
     if (!config || !config.enabled) {
       console.log("Heartbeat: disabled or no config");
@@ -1610,6 +1628,7 @@ async function heartbeatTick(): Promise<void> {
       message_text: finalMessage.trim(),
       message_length: finalMessage.length,
     });
+    })(), CLAUDE_ABSOLUTE_TIMEOUT_MS, "Heartbeat tick");
   } catch (e) {
     console.error("Heartbeat tick error:", e);
     await logEventV2("heartbeat_error", String(e).substring(0, 200));
@@ -1768,6 +1787,8 @@ async function evolutionTick(): Promise<void> {
 
   evolutionRunning = true;
   try {
+    // Wall-clock timeout: prevent a stuck callClaude or Supabase call from blocking evolution forever
+    await withTimeout((async () => {
     // Check if evolution is enabled
     if (supabase) {
       const { data } = await supabase
@@ -1825,6 +1846,7 @@ async function evolutionTick(): Promise<void> {
       console.error("Evolution error:", e);
       await logEventV2("evolution_error", String(e).substring(0, 200));
     }
+    })(), CLAUDE_ABSOLUTE_TIMEOUT_MS, "Evolution tick");
   } catch (e) {
     console.error("Evolution tick error:", e);
     await logEventV2("evolution_error", String(e).substring(0, 200));
