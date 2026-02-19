@@ -2240,12 +2240,16 @@ async function sendStartupNotification(): Promise<void> {
       await unlink(RESTART_REASON_FILE);
     } catch {}
 
-    let message = `✅ <b>Relay online</b> — ${now}`;
+    // Build message: conversational body (from restart-reason) + technical footer
+    let message: string;
+    const footer = `— ✅ ${now}${lastCommit ? ` | <code>${lastCommit}</code>` : ""}`;
+
     if (restartReason) {
-      message += `\n📋 ${restartReason}`;
-    }
-    if (lastCommit) {
-      message += `\n🔧 Last commit: <code>${lastCommit}</code>`;
+      // restart-reason.txt should contain a conversational message ready to send
+      message = `${restartReason}\n\n${footer}`;
+    } else {
+      // No restart context — clean start or unexpected restart
+      message = `✅ <b>Relay online</b>\n\n${footer}`;
     }
 
     await bot.api.sendMessage(userId, message, { parse_mode: "HTML" });
