@@ -188,7 +188,7 @@ async function buildSkillRegistry(): Promise<string> {
     }
 
     if (skills.length === 0) return "";
-    return `AVAILABLE SKILLS (read the full SKILL.md in ~/.claude/skills/<name>/ before using):\n${skills.join("\n")}`;
+    return `AVAILABLE SKILLS — MANDATORY: Before starting ANY task, check this list. If a skill matches the request, USE IT instead of improvising. Read the full SKILL.md in ~/.claude/skills/<name>/ before invoking:\n${skills.join("\n")}`;
   } catch {
     return "";
   }
@@ -3958,6 +3958,10 @@ async function buildPrompt(userMessage: string, threadInfo?: ThreadInfo): Promis
 
   let prompt = `${soul}\n\nCurrent time: ${timeStr}`;
 
+  if (skillRegistry) {
+    prompt += `\n\n${skillRegistry}`;
+  }
+
   if (memoryFacts.length > 0) {
     prompt += "\n\nTHINGS I KNOW ABOUT THE USER:\n";
     prompt += memoryFacts.map((m) => `- ${m}`).join("\n");
@@ -3996,10 +4000,6 @@ async function buildPrompt(userMessage: string, threadInfo?: ThreadInfo): Promis
 
   if (threadContext) {
     prompt += threadContext;
-  }
-
-  if (skillRegistry) {
-    prompt += `\n\n${skillRegistry}`;
   }
 
   prompt += `
