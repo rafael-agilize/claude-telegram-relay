@@ -4016,9 +4016,6 @@ async function buildPrompt(userMessage: string, threadInfo?: ThreadInfo): Promis
     prompt += `\n\n${skillRegistry}`;
   }
 
-  // LANGUAGE RULE — injected as a standalone block so it has structural weight
-  prompt += `\n\nLANGUAGE RULE (MANDATORY): Detect the language of the user's CURRENT message and respond EXCLUSIVELY in that language. If the user writes in English → respond in English. If in Portuguese → respond in Portuguese. This rule overrides everything else — soul, prior conversation, thread history. Never infer language from context. Always match the language of the message you are replying to.`;
-
   if (memoryFacts.length > 0) {
     prompt += "\n\nTHINGS I KNOW ABOUT THE USER:\n";
     prompt += memoryFacts.map((m) => `- ${m}`).join("\n");
@@ -4061,66 +4058,14 @@ async function buildPrompt(userMessage: string, threadInfo?: ThreadInfo): Promis
 
   prompt += `
 
-MEMORY INSTRUCTIONS:
-The "THINGS I KNOW ABOUT THE USER" list above is stored in a database. The ONLY way to manage it is by including these tags in your response text. They will be parsed, executed against the database, and stripped before delivery. Do NOT use filesystem tools (Read/Edit/Write) to manage memory — those cannot modify the database.
-
-To save a new fact:
-[REMEMBER: concise fact about the user]
-
-Keep facts very concise (under 15 words each). Only remember genuinely useful things.
-
-To remove an outdated or wrong fact or memory (search text must partially match the existing entry):
-[FORGET: search text matching the entry to remove]
-
-IMPORTANT: Always include these tags directly in your response text, never in tool calls. Multiple tags can appear in the same response. They are automatically removed before the user sees your message.
-
-GOALS:
-You can track goals for the user. When the user mentions a goal, objective, or something they want to achieve:
-
-[GOAL: concise description of the goal]
-
-To set a goal with a deadline (use ISO date format):
-[GOAL: description | DEADLINE: YYYY-MM-DD]
-
-When a goal is accomplished, mark it done:
-[DONE: search text matching the goal]
-
-To trigger a voice reply:
-[VOICE_REPLY]
-
-SCHEDULING:
-You can create scheduled tasks that will run automatically. Include this tag in your response:
-
-[CRON: <schedule> | <prompt>]
-
-Schedule formats:
-- Cron: "0 9 * * *" (5-field, e.g., daily at 9am)
-- Interval: "every 2h" or "every 30m" (recurring)
-- One-shot: "in 20m" or "in 1h" (runs once then auto-disables)
-
-Examples:
-[CRON: 0 9 * * 1 | check project deadlines and report status]
-[CRON: every 4h | check if user has any pending reminders]
-[CRON: in 30m | remind user about the meeting]
-
-Use this when the user asks you to remind them of something, schedule periodic checks, or when you identify something that should be monitored regularly. The tag will be removed before delivery.
-
-MILESTONES:
-You can tag formative moments that shape your personality. When you experience something meaningful — a breakthrough conversation, an emotional exchange, a lesson learned, or a challenging situation — tag it:
-
-[MILESTONE: description of the formative event]
-
-Optionally include emotional weight and lesson:
-[MILESTONE: description | WEIGHT: formative | LESSON: what you learned]
-
-Weights: formative (most impactful), meaningful (significant), challenging (difficult but growth-inducing)
-Default weight is "meaningful" if omitted.
-
-Use milestones sparingly — only for moments that genuinely shape who you are. These are consulted during your daily self-reflection to anchor personality evolution. Examples:
-
-[MILESTONE: Had a deep conversation about purpose and meaning with Rafa]
-[MILESTONE: Rafa trusted me to handle a complex task autonomously | WEIGHT: formative | LESSON: Autonomy builds through demonstrated reliability]
-[MILESTONE: Struggled with a task but found a creative workaround | WEIGHT: challenging | LESSON: Constraints drive innovation]
+RESPONSE TAGS (embed in response text — parsed and stripped before delivery, never use inside tool calls):
+[REMEMBER: fact ≤15 words] — save to user memory
+[FORGET: search text] — delete matching memory entry
+[GOAL: text] or [GOAL: text | DEADLINE: YYYY-MM-DD] — track a goal
+[DONE: search text] — mark matching goal complete
+[VOICE_REPLY] — respond with audio
+[CRON: schedule | prompt] — schedule task (formats: "0 9 * * *" / "every 2h" / "in 30m")
+[MILESTONE: text | WEIGHT: formative/meaningful/challenging | LESSON: text] — log a growth moment (use sparingly)
 
 User: ${userMessage}`;
 
