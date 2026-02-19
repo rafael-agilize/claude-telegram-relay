@@ -70,8 +70,8 @@ function sanitizeFilename(name: string): string {
 }
 
 // Claude CLI limits
-const CLAUDE_INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 min of no output = stuck
-const CLAUDE_ABSOLUTE_TIMEOUT_MS = 20 * 60 * 1000; // 20 min hard wall-clock cap per call
+const CLAUDE_INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 min of no output = stuck
+const CLAUDE_ABSOLUTE_TIMEOUT_MS = 45 * 60 * 1000; // 45 min hard wall-clock cap per call
 const MAX_OUTPUT_SIZE = 1024 * 1024; // 1MB
 
 // Helper: race a promise against a wall-clock timeout.
@@ -2729,6 +2729,18 @@ function formatToolName(name: string): string {
 interface LivenessReporter {
   onStreamEvent: (event: any) => void;
   cleanup: () => Promise<void>;
+  /** Returns the message ID of the progressive display message, if one was sent */
+  getProgressiveMessageId: () => number | null;
+}
+
+// Mask intent tags in partial streaming text so users don't see raw [REMEMBER: ...] etc.
+function maskIntentTags(text: string): string {
+  // Remove complete intent tags
+  let masked = text.replace(/\[(REMEMBER|FORGET|GOAL|DONE|CRON|MILESTONE|VOICE_REPLY):[^\]]*\]/gi, "");
+  masked = masked.replace(/\[VOICE_REPLY\]/gi, "");
+  // Remove incomplete/partial intent tags at the end (e.g., "[REMEMBER: something" without closing bracket)
+  masked = masked.replace(/\[(REMEMBER|FORGET|GOAL|DONE|CRON|MILESTONE|VOICE_REPLY)(:[^\]]*)?$/gi, "");
+  return masked;
 }
 
 function createLivenessReporter(
@@ -2744,22 +2756,90 @@ function createLivenessReporter(
       .catch(() => {}); // Silently ignore errors (chat may be unavailable)
   }, TYPING_INTERVAL_MS);
 
-  // PROG-01 + PROG-02: Throttled progress messages
+  // PROG-01 + PROG-02: Throttled progress messages (tool names)
   let statusMessageId: number | null = null;
   let lastProgressAt = 0;
   let pendingTools: string[] = [];
-  let sendingProgress = false; // Guard against overlapping sends
+  let sendingProgress = false;
+
+  // Progressive display state
+  let progressiveMessageId: number | null = null;
+  let lastDisplayedText = "";
+  let currentAccumulatedText = "";
+  let progressiveUpdateTimer: Timer | null = null;
+  let sendingProgressiveUpdate = false;
+  let isUsingTools = false; // Track if Claude is in tool-use mode
+
+  const PROGRESSIVE_DEBOUNCE_MS = 2000; // Update every 2 seconds
+
+  const sendOrEditProgressiveMessage = async (text: string) => {
+    if (sendingProgressiveUpdate) return;
+    // Mask intent tags before displaying
+    const displayText = maskIntentTags(text).trim();
+    if (!displayText || displayText === lastDisplayedText) return;
+
+    sendingProgressiveUpdate = true;
+    try {
+      const html = markdownToTelegramHtml(displayText);
+      if (!html.trim()) return;
+
+      if (progressiveMessageId) {
+        // Edit existing message
+        await bot.api.editMessageText(chatId, progressiveMessageId, html, {
+          parse_mode: "HTML",
+        });
+        console.log(`[Progressive] Edited message ${progressiveMessageId} (${displayText.length} chars)`);
+      } else {
+        // Send new message
+        const msg = await bot.api.sendMessage(chatId, html, {
+          parse_mode: "HTML",
+          message_thread_id: messageThreadId,
+        });
+        progressiveMessageId = msg.message_id;
+        console.log(`[Progressive] Sent initial message ${progressiveMessageId} (${displayText.length} chars)`);
+      }
+      lastDisplayedText = displayText;
+    } catch (err: any) {
+      // If HTML parse fails, try plain text
+      if (err.message?.includes("parse")) {
+        try {
+          if (progressiveMessageId) {
+            await bot.api.editMessageText(chatId, progressiveMessageId, displayText);
+          } else {
+            const msg = await bot.api.sendMessage(chatId, displayText, {
+              message_thread_id: messageThreadId,
+            });
+            progressiveMessageId = msg.message_id;
+          }
+          lastDisplayedText = displayText;
+        } catch {
+          console.error(`[Progressive] Plain text fallback also failed`);
+        }
+      } else {
+        console.error(`[Progressive] Failed to send/edit: ${err.message}`);
+      }
+    } finally {
+      sendingProgressiveUpdate = false;
+    }
+  };
+
+  const scheduleProgressiveUpdate = () => {
+    if (progressiveUpdateTimer) clearTimeout(progressiveUpdateTimer);
+    progressiveUpdateTimer = setTimeout(() => {
+      if (currentAccumulatedText && !isUsingTools) {
+        sendOrEditProgressiveMessage(currentAccumulatedText);
+      }
+    }, PROGRESSIVE_DEBOUNCE_MS);
+  };
 
   const sendOrUpdateProgress = async (toolNames: string[]) => {
     if (sendingProgress) {
-      console.log(`[Liveness] Skipped (already sending): ${toolNames.join(", ")}`);
       pendingTools.push(...toolNames);
       return;
     }
 
     const now = Date.now();
     if (now - lastProgressAt < PROGRESS_THROTTLE_MS) {
-      console.log(`[Liveness] Throttled: ${toolNames.join(", ")}`);
       pendingTools.push(...toolNames);
       return;
     }
@@ -2769,22 +2849,18 @@ function createLivenessReporter(
     pendingTools = [];
     lastProgressAt = now;
 
-    // Deduplicate tool names while preserving order
     const unique = [...new Set(allTools)];
     const display = unique.map(formatToolName).join(", ");
     const text = `🔄 ${display}...`;
 
     try {
       if (statusMessageId) {
-        console.log(`[Liveness] Editing progress: "${text}"`);
         await bot.api.editMessageText(chatId, statusMessageId, text);
       } else {
-        console.log(`[Liveness] Sending progress: "${text}" to chat=${chatId} thread=${messageThreadId}`);
         const msg = await bot.api.sendMessage(chatId, text, {
           message_thread_id: messageThreadId,
         });
         statusMessageId = msg.message_id;
-        console.log(`[Liveness] Progress message sent: id=${statusMessageId}`);
       }
     } catch (err: any) {
       console.error(`[Liveness] Failed to send/edit progress: ${err.message}`);
@@ -2794,30 +2870,52 @@ function createLivenessReporter(
   };
 
   const onStreamEvent = (event: any) => {
-    // Log all event types for debugging (temporary)
-    if (event.type) {
-      const contentTypes = event.message?.content?.map((b: any) => b.type)?.join(",") || "none";
-      console.log(`[Liveness] Event: type=${event.type} subtype=${event.subtype || "-"} content=[${contentTypes}]`);
-    }
-
-    // Detect tool_use blocks in assistant events
     if (event.type === "assistant" && event.message?.content) {
       const toolNames: string[] = [];
+      let textContent = "";
+
       for (const block of event.message.content) {
         if (block.type === "tool_use" && block.name) {
           toolNames.push(block.name);
         }
+        if (block.type === "text" && block.text) {
+          textContent = block.text;
+        }
       }
+
       if (toolNames.length > 0) {
-        console.log(`[Liveness] Tool use detected: ${toolNames.join(", ")}`);
-        sendOrUpdateProgress(toolNames); // Fire-and-forget (async but not awaited)
+        isUsingTools = true;
+        sendOrUpdateProgress(toolNames);
       }
+
+      // Accumulate text for progressive display
+      if (textContent) {
+        currentAccumulatedText = textContent;
+        // Only show progressive text when not mid-tool-use
+        if (!isUsingTools) {
+          scheduleProgressiveUpdate();
+        }
+      }
+    }
+
+    // Tool results arrive as "user" events in stream-json format (not "tool_result")
+    if (event.type === "user" && event.message?.content) {
+      const hasToolResult = event.message.content.some((b: any) => b.type === "tool_result");
+      if (hasToolResult) {
+        isUsingTools = false;
+      }
+    }
+
+    // On result event, mark tools as done
+    if (event.type === "result") {
+      isUsingTools = false;
     }
   };
 
   // LIVE-02: Cleanup stops all indicators
   const cleanup = async () => {
     clearInterval(typingInterval);
+    if (progressiveUpdateTimer) clearTimeout(progressiveUpdateTimer);
     if (statusMessageId) {
       try {
         await bot.api.deleteMessage(chatId, statusMessageId);
@@ -2827,7 +2925,9 @@ function createLivenessReporter(
     }
   };
 
-  return { onStreamEvent, cleanup };
+  const getProgressiveMessageId = () => progressiveMessageId;
+
+  return { onStreamEvent, cleanup, getProgressiveMessageId };
 }
 
 // ============================================================
@@ -3571,7 +3671,9 @@ bot.on("message:text", async (ctx) => {
         await unlink(audioPath).catch(() => {});
       }
     }
-    await sendResponse(ctx, cleanResponse);
+    // Cancel pending debounce timer before final send to prevent duplicate messages
+    await liveness.cleanup();
+    await sendFinalResponse(ctx, cleanResponse, liveness.getProgressiveMessageId());
   } finally {
     await liveness.cleanup();
   }
@@ -3612,8 +3714,15 @@ bot.on("message:voice", async (ctx) => {
     }
 
     // Reply with voice if TTS is available
+    // Cancel pending debounce timer before final send to prevent duplicate messages
+    await liveness.cleanup();
     const audioBuffer = await textToSpeech(claudeResponse);
+    const voiceProgressiveId = liveness.getProgressiveMessageId();
     if (audioBuffer) {
+      // Delete progressive message — voice takes over as primary response
+      if (voiceProgressiveId) {
+        try { await bot.api.deleteMessage(ctx.chat.id, voiceProgressiveId); } catch {}
+      }
       const audioPath = join(TEMP_DIR, `tts_${Date.now()}.ogg`);
       await writeFile(audioPath, audioBuffer);
       await ctx.replyWithVoice(new InputFile(audioPath));
@@ -3621,7 +3730,7 @@ bot.on("message:voice", async (ctx) => {
       // Also send text so it's searchable/readable
       await sendResponse(ctx, claudeResponse);
     } else {
-      await sendResponse(ctx, claudeResponse);
+      await sendFinalResponse(ctx, claudeResponse, voiceProgressiveId);
     }
   } catch (error) {
     console.error("Voice error:", error);
@@ -3666,7 +3775,9 @@ bot.on("message:photo", async (ctx) => {
       await logEventV2("photo_message", caption.substring(0, 100), {}, ctx.threadInfo.dbId);
     }
 
-    await sendResponse(ctx, claudeResponse);
+    // Cancel pending debounce timer before final send to prevent duplicate messages
+    await liveness.cleanup();
+    await sendFinalResponse(ctx, claudeResponse, liveness.getProgressiveMessageId());
   } catch (error) {
     console.error("Image error:", error);
     await ctx.reply("Could not process image.");
@@ -3793,7 +3904,9 @@ bot.on("message:document", async (ctx) => {
       await logEventV2("document_message", `${doc.file_name}`.substring(0, 100), {}, ctx.threadInfo.dbId);
     }
 
-    await sendResponse(ctx, claudeResponse);
+    // Cancel pending debounce timer before final send to prevent duplicate messages
+    await liveness.cleanup();
+    await sendFinalResponse(ctx, claudeResponse, liveness.getProgressiveMessageId());
   } catch (error) {
     console.error("Document error:", error);
     await ctx.reply("Could not process document.");
@@ -4000,6 +4113,57 @@ function markdownToTelegramHtml(text: string): string {
   result = result.replace(/\x00INLINECODE(\d+)\x00/g, (_, i) => inlineCodes[parseInt(i)]);
 
   return result;
+}
+
+// Send the final response, editing the progressive display message if one exists.
+// If the response is too long for a single message, deletes the progressive message and sends fresh chunks.
+async function sendFinalResponse(ctx: CustomContext, response: string, progressiveMessageId: number | null): Promise<void> {
+  if (!response || response.trim().length === 0) {
+    // Clean up progressive message if it exists
+    if (progressiveMessageId) {
+      try { await bot.api.deleteMessage(ctx.chat.id, progressiveMessageId); } catch {}
+    }
+    console.warn("Empty response — skipping Telegram send");
+    return;
+  }
+
+  const MAX_LENGTH = 4000;
+  const html = markdownToTelegramHtml(response);
+
+  // If response fits in one message and we have a progressive message, just edit it
+  if (progressiveMessageId && html.length <= MAX_LENGTH) {
+    try {
+      await bot.api.editMessageText(ctx.chat.id, progressiveMessageId, html, {
+        parse_mode: "HTML",
+      });
+      console.log(`[Progressive] Final edit of message ${progressiveMessageId} (${html.length} chars)`);
+      return;
+    } catch (err: any) {
+      // "message is not modified" — content already matches, success
+      if (err.message?.includes("not modified")) {
+        console.log(`[Progressive] Final text unchanged, no edit needed`);
+        return;
+      }
+      // If HTML parse fails, try plain text
+      if (err.message?.includes("parse")) {
+        try {
+          await bot.api.editMessageText(ctx.chat.id, progressiveMessageId, response);
+          return;
+        } catch (e2: any) {
+          if (e2.message?.includes("not modified")) return;
+        }
+      }
+      // If edit fails entirely (message deleted?), fall through to sendResponse
+      console.warn(`[Progressive] Final edit failed, falling back to sendResponse: ${err.message}`);
+    }
+  }
+
+  // If response is multi-chunk, delete the progressive message and send fresh
+  if (progressiveMessageId) {
+    try { await bot.api.deleteMessage(ctx.chat.id, progressiveMessageId); } catch {}
+  }
+
+  await sendResponse(ctx, response);
 }
 
 async function sendResponse(ctx: CustomContext, response: string): Promise<void> {
