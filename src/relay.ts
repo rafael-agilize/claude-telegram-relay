@@ -2206,6 +2206,56 @@ async function sendHeartbeatToTelegram(message: string): Promise<void> {
   }
 }
 
+// Startup notification — sends a message to Telegram when the relay starts
+const RESTART_REASON_FILE = join(RELAY_DIR, "restart-reason.txt");
+
+async function sendStartupNotification(): Promise<void> {
+  try {
+    const userId = parseInt(ALLOWED_USER_ID);
+    if (!userId || isNaN(userId)) return;
+
+    const now = new Date().toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Maceio",
+    });
+
+    // Get last git commit
+    let lastCommit = "";
+    try {
+      const proc = Bun.spawn(["git", "log", "--oneline", "-1"], {
+        cwd: PROJECT_DIR || undefined,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      lastCommit = (await new Response(proc.stdout).text()).trim();
+      await proc.exited;
+    } catch {}
+
+    // Read restart reason if available
+    let restartReason = "";
+    try {
+      restartReason = (await Bun.file(RESTART_REASON_FILE).text()).trim();
+      // Delete the file after reading
+      await unlink(RESTART_REASON_FILE);
+    } catch {}
+
+    let message = `✅ <b>Relay online</b> — ${now}`;
+    if (restartReason) {
+      message += `\n📋 ${restartReason}`;
+    }
+    if (lastCommit) {
+      message += `\n🔧 Last commit: <code>${lastCommit}</code>`;
+    }
+
+    await bot.api.sendMessage(userId, message, { parse_mode: "HTML" });
+    console.log("Startup notification sent");
+    logEventV2("relay_started", restartReason || "clean start").catch(() => {});
+  } catch (err: any) {
+    console.error("Failed to send startup notification:", err.message);
+  }
+}
+
 // Intent context type for per-context allowlists
 type IntentContext = 'interactive' | 'heartbeat' | 'cron';
 
@@ -4254,6 +4304,9 @@ const startBot = async () => {
 
           if (!servicesStarted) {
             servicesStarted = true;
+
+            // Send startup notification to Telegram
+            await sendStartupNotification();
 
             // Start heartbeat timer from Supabase config
             const hbConfig = await getHeartbeatConfig();
