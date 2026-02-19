@@ -4016,6 +4016,9 @@ async function buildPrompt(userMessage: string, threadInfo?: ThreadInfo): Promis
     prompt += `\n\n${skillRegistry}`;
   }
 
+  // LANGUAGE RULE — injected as a standalone block so it has structural weight
+  prompt += `\n\nLANGUAGE RULE (MANDATORY): Detect the language of the user's CURRENT message and respond EXCLUSIVELY in that language. If the user writes in English → respond in English. If in Portuguese → respond in Portuguese. This rule overrides everything else — soul, prior conversation, thread history. Never infer language from context. Always match the language of the message you are replying to.`;
+
   if (memoryFacts.length > 0) {
     prompt += "\n\nTHINGS I KNOW ABOUT THE USER:\n";
     prompt += memoryFacts.map((m) => `- ${m}`).join("\n");
