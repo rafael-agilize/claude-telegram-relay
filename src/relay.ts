@@ -1670,6 +1670,90 @@ let lastEvolutionDate: string | null = null; // Daily dedup: "2026-02-15"
 const EVOLUTION_HOUR = parseInt(process.env.EVOLUTION_HOUR || "0"); // 0 = midnight
 const EVOLUTION_TIMEZONE = process.env.EVOLUTION_TIMEZONE || "America/Sao_Paulo";
 
+// Non-destructive memory compaction — merges redundant facts, no information loss
+async function compactMemoryFacts(): Promise<void> {
+  if (!supabase) return;
+  try {
+    const { data: facts, error } = await supabase
+      .from("global_memory")
+      .select("id, content")
+      .eq("type", "fact")
+      .order("created_at", { ascending: true });
+
+    if (error || !facts || facts.length < 4) return; // nothing worth compacting
+
+    // Build numbered list — use indices to avoid confusing Claude with raw UUIDs
+    const indexed = facts.map((f: { id: string; content: string }, i: number) => ({ num: i + 1, ...f }));
+    const factList = indexed.map((f: { num: number; content: string }) => `#${f.num}: ${f.content}`).join("\n");
+
+    const prompt = `You are a memory compaction assistant. Below is a numbered list of facts stored about a user.
+
+RULES — READ CAREFULLY:
+- You MUST preserve every piece of information. This is non-destructive.
+- You may MERGE two or more facts into one only if they contain genuinely overlapping or redundant information. The merged text must include ALL information from all merged entries.
+- You may REPHRASE a single fact to be more concise, keeping every detail intact.
+- Only suggest changes where there are real redundancies. Do NOT merge unrelated facts.
+- If the list is already clean, respond only with: COMPACT_OK
+
+OUTPUT FORMAT (one operation per line, nothing else):
+MERGE: #N,#M -> merged text containing all information from both
+REPHRASE: #N -> rephrased text that is shorter but loses nothing
+COMPACT_OK
+
+FACTS:
+${factList}`;
+
+    const { text } = await callClaude(prompt);
+    if (!text || text.includes("COMPACT_OK")) {
+      console.log("Memory compaction: no changes needed");
+      return;
+    }
+
+    let mergeCount = 0;
+    let rephraseCount = 0;
+    const idMap = new Map(indexed.map((f: { num: number; id: string }) => [f.num, f.id]));
+
+    // Apply MERGE operations
+    const mergeRegex = /MERGE:\s*#?([\d,\s]+)\s*->\s*(.+)/g;
+    for (const match of text.matchAll(mergeRegex)) {
+      const nums = match[1].split(",").map((s: string) => parseInt(s.trim())).filter((n: number) => !isNaN(n));
+      const newContent = match[2].trim().substring(0, 200);
+      if (nums.length < 2 || !newContent) continue;
+
+      const ids = nums.map((n: number) => idMap.get(n)).filter(Boolean) as string[];
+      if (ids.length !== nums.length) continue; // safety: only proceed if all IDs resolved
+
+      // Insert merged fact first, then delete originals
+      await insertMemory(newContent, "fact");
+      for (const id of ids) {
+        await supabase.from("global_memory").delete().eq("id", id);
+      }
+      mergeCount++;
+      console.log(`Memory compaction: merged #${nums.join(",")} → "${newContent.substring(0, 60)}..."`);
+    }
+
+    // Apply REPHRASE operations
+    const rephraseRegex = /REPHRASE:\s*#?(\d+)\s*->\s*(.+)/g;
+    for (const match of text.matchAll(rephraseRegex)) {
+      const num = parseInt(match[1].trim());
+      const newContent = match[2].trim().substring(0, 200);
+      const id = idMap.get(num);
+      if (!id || !newContent) continue;
+
+      await supabase.from("global_memory").update({ content: newContent }).eq("id", id);
+      rephraseCount++;
+      console.log(`Memory compaction: rephrased #${num} → "${newContent.substring(0, 60)}..."`);
+    }
+
+    if (mergeCount > 0 || rephraseCount > 0) {
+      await logEventV2("memory_compaction", `Merged: ${mergeCount}, Rephrased: ${rephraseCount}`, { mergeCount, rephraseCount });
+      console.log(`Memory compaction: ${mergeCount} merges, ${rephraseCount} rephrasals applied`);
+    }
+  } catch (e) {
+    console.error("compactMemoryFacts error:", e);
+  }
+}
+
 async function performDailyEvolution(): Promise<void> {
   // Cheap count check: skip evolution if no conversations today (saves tokens)
   if (supabase) {
@@ -1787,6 +1871,10 @@ async function performDailyEvolution(): Promise<void> {
     await sendHeartbeatToTelegram(reportMessage);
 
     console.log("Evolution: report delivered to Telegram");
+
+    // Compact memory facts — non-destructive, merges redundancies
+    console.log("Evolution: running memory compaction...");
+    await compactMemoryFacts();
   } catch (e) {
     console.error("Evolution: error during save/notify:", e);
     await logEventV2("evolution_error", String(e).substring(0, 200));
