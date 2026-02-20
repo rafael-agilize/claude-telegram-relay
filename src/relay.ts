@@ -1705,7 +1705,8 @@ ${factList}`;
 
     const { text } = await callClaude(prompt);
     if (!text || text.includes("COMPACT_OK")) {
-      console.log("Memory compaction: no changes needed");
+      console.log(`Memory compaction: no changes needed (${facts.length} facts reviewed)`);
+      await logEventV2("memory_compaction", "No changes needed", { facts_reviewed: facts.length });
       return;
     }
 
