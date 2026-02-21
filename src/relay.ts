@@ -4333,6 +4333,54 @@ process.on("unhandledRejection", (reason) => {
   logEventV2("unhandled_rejection", String(reason).substring(0, 200)).catch(() => {});
 });
 
+// Catch-up evolution: runs if the scheduled midnight evolution was missed (e.g. computer offline)
+async function catchUpEvolutionIfMissed(): Promise<void> {
+  if (!supabase) return;
+  try {
+    // Only catch up if we're past the evolution hour today
+    const now = new Date();
+    const currentHour = parseInt(
+      now.toLocaleString("en-US", {
+        timeZone: EVOLUTION_TIMEZONE,
+        hour: "numeric",
+        hour12: false,
+      })
+    );
+    if (currentHour <= EVOLUTION_HOUR) return; // Too early — evolution hasn't been due yet
+
+    // Check if evolution already ran today via logs_v2
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const { data: todayLogs } = await supabase
+      .from("logs_v2")
+      .select("id")
+      .in("event", ["evolution_complete", "evolution_started"])
+      .gte("created_at", todayStart.toISOString())
+      .limit(1);
+
+    if (todayLogs && todayLogs.length > 0) {
+      console.log("Evolution catch-up: already ran today, skipping");
+      return;
+    }
+
+    console.log("Evolution catch-up: missed midnight run detected — running now");
+    await logEventV2("evolution_catchup", "Running missed evolution on startup");
+
+    // Mark as ran so the timer doesn't double-fire at next midnight tick
+    const todayDate = now.toLocaleString("en-US", {
+      timeZone: EVOLUTION_TIMEZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).split("/").reverse().join("-");
+    lastEvolutionDate = todayDate;
+
+    await performDailyEvolution();
+  } catch (e) {
+    console.error("Evolution catch-up error:", e);
+  }
+}
+
 // Resilient polling — auto-restarts if Grammy's polling loop crashes (e.g. 409 conflict)
 let servicesStarted = false;
 const startBot = async () => {
@@ -4362,6 +4410,9 @@ const startBot = async () => {
 
             // Start evolution timer
             startEvolutionTimer();
+
+            // Catch-up: if evolution was missed today (computer was offline at midnight), run it now
+            await catchUpEvolutionIfMissed();
           }
         },
       });
