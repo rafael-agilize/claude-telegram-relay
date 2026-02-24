@@ -2363,6 +2363,9 @@ async function processIntents(response: string, threadDbId?: string, context: In
   let clean = response;
   const failures: string[] = [];
 
+  // Strip [SUMMARY: ...] tags injected by global CLAUDE.md — terminal-only, not for Telegram
+  clean = clean.replace(/\[SUMMARY:[^\]]*\]/gi, "").trim();
+
   // Log if any intent tags are detected at all
   const hasIntents = /\[(REMEMBER|FORGET|GOAL|DONE|CRON|VOICE_REPLY|MILESTONE)[:\]]/i.test(response);
   if (hasIntents) {
@@ -2911,6 +2914,7 @@ function createLivenessReporter(
   let currentAccumulatedText = "";
   let progressiveUpdateTimer: Timer | null = null;
   let sendingProgressiveUpdate = false;
+  let progressiveSendPromise: Promise<void> | null = null;
   let isUsingTools = false; // Track if Claude is in tool-use mode
 
   const PROGRESSIVE_DEBOUNCE_MS = 2000; // Update every 2 seconds
@@ -2970,7 +2974,7 @@ function createLivenessReporter(
     if (progressiveUpdateTimer) clearTimeout(progressiveUpdateTimer);
     progressiveUpdateTimer = setTimeout(() => {
       if (currentAccumulatedText && !isUsingTools) {
-        sendOrEditProgressiveMessage(currentAccumulatedText);
+        progressiveSendPromise = sendOrEditProgressiveMessage(currentAccumulatedText);
       }
     }, PROGRESSIVE_DEBOUNCE_MS);
   };
@@ -3059,6 +3063,12 @@ function createLivenessReporter(
   const cleanup = async () => {
     clearInterval(typingInterval);
     if (progressiveUpdateTimer) clearTimeout(progressiveUpdateTimer);
+    // Await any in-flight progressive send so progressiveMessageId is set before
+    // sendFinalResponse runs — prevents race-condition duplicate messages
+    if (progressiveSendPromise) {
+      await progressiveSendPromise;
+      progressiveSendPromise = null;
+    }
     if (statusMessageId) {
       try {
         await bot.api.deleteMessage(chatId, statusMessageId);
